@@ -174,6 +174,28 @@ A task is DONE only when:
 
 ---
 
+## 8.5) Documentation Requirements (MANDATORY)
+Create a folder at repo root: `/analysis`
+
+For EVERY step (Step 0, Step 1, Step 2, ...), create an MD file:
+- `/analysis/STEP_0.md`
+- `/analysis/STEP_1.md`
+- `/analysis/STEP_2.md`
+- ...
+
+Each step file must include:
+1) What was implemented in this step (bullet list)
+2) Files changed (list)
+3) Difficulties / errors encountered + how they were fixed
+4) Differences observed between Flutter and Expo during this step
+   - UI differences (fonts, spacing, icons, scaling)
+   - behavior differences (timers, layout, navigation)
+5) Final parity status: Flutter ✅ / Expo ✅
+6) Next step plan (short)
+
+Also, for steps already completed, backfill the missing files (e.g., STEP_0.md and STEP_1.md).
+
+---
 ## 9) MVP Scope (What to build first)
 ### Phase 1: UI-only (no real APIs yet)
 - Build all 5 tabs with mock data matching the Figma.
