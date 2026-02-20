@@ -1,19 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Spacing, SalahLayout, Typography, interFont } from '../theme/theme';
+import { Spacing, SalahLayout, interFont } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 import AppIconButton from './AppIconButton';
 
 export default function AppHeader({ title, onSettingsTap }) {
+    const { theme: tc } = useTheme();
     return (
         <View style={styles.container}>
             <View style={styles.locationRow}>
                 <MaterialCommunityIcons
                     name="map-marker"
                     size={SalahLayout.locationIconSize}
-                    color={Colors.accentGold}
+                    color={tc.accent}
                 />
-                <Text style={styles.title}>{title}</Text>
+                <Text style={[styles.title, { color: tc.textPrimary }]}>{title}</Text>
             </View>
             <AppIconButton
                 icon="cog-outline"
@@ -40,6 +42,5 @@ const styles = StyleSheet.create({
     title: {
         fontFamily: interFont('500'),
         fontSize: 16,
-        color: Colors.textPrimary,
     },
 });

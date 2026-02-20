@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
+import '../services/location_service.dart';
 import '../models/prayer_times.dart';
 import '../services/prayer_api.dart';
 import '../components/app_header.dart';
@@ -10,7 +12,14 @@ import '../components/prayer_row.dart';
 import '../components/app_divider.dart';
 
 class SalahScreen extends StatefulWidget {
-  const SalahScreen({super.key});
+  final VoidCallback? onSettingsTap;
+  final LocationNotifier locationNotifier;
+
+  const SalahScreen({
+    super.key,
+    this.onSettingsTap,
+    required this.locationNotifier,
+  });
 
   @override
   State<SalahScreen> createState() => _SalahScreenState();
@@ -30,10 +39,17 @@ class _SalahScreenState extends State<SalahScreen> {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    // Re-load prayer times when location changes (auto-detect or manual)
+    widget.locationNotifier.addListener(_onLocationChanged);
+  }
+
+  void _onLocationChanged() {
+    _load();
   }
 
   @override
   void dispose() {
+    widget.locationNotifier.removeListener(_onLocationChanged);
     _timer?.cancel();
     super.dispose();
   }
@@ -70,9 +86,11 @@ class _SalahScreenState extends State<SalahScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
+
     if (_loading && _timings == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.accentGold),
+      return Center(
+        child: CircularProgressIndicator(color: tc.accent),
       );
     }
 
@@ -82,7 +100,7 @@ class _SalahScreenState extends State<SalahScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error ?? 'Unknown error', style: AppTypography.caption),
+            Text(_error ?? 'Unknown error', style: AppTypography.caption(tc)),
             const SizedBox(height: AppSpacing.s16),
             ElevatedButton(onPressed: _load, child: const Text('Retry')),
           ],
@@ -96,13 +114,25 @@ class _SalahScreenState extends State<SalahScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      color: AppColors.accentGold,
+      color: tc.accent,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           // ── Header ──
           const SizedBox(height: SalahLayout.headerMarginTop),
-          const AppHeader(title: 'Bucharest'),
+          ListenableBuilder(
+            listenable: widget.locationNotifier,
+            builder: (context, _) {
+              final loc = widget.locationNotifier.data;
+              final cityLabel = loc.country.isNotEmpty
+                  ? '${loc.city}, ${loc.country}'
+                  : loc.city;
+              return AppHeader(
+                title: cityLabel,
+                onSettingsTap: widget.onSettingsTap,
+              );
+            },
+          ),
           const SizedBox(height: SalahLayout.headerMarginBottom),
 
           // ── Error banner ──
@@ -112,10 +142,10 @@ class _SalahScreenState extends State<SalahScreen> {
                   horizontal: SalahLayout.screenPadding),
               padding: const EdgeInsets.all(AppSpacing.s8),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: tc.card,
                 borderRadius: BorderRadius.circular(AppSpacing.s8),
               ),
-              child: Text(_error!, style: AppTypography.caption),
+              child: Text(_error!, style: AppTypography.caption(tc)),
             ),
 
           // ── Date row ──
@@ -126,12 +156,12 @@ class _SalahScreenState extends State<SalahScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(t.gregorianFormatted, style: AppTypography.caption),
+                Text(t.gregorianFormatted, style: AppTypography.caption(tc)),
                 Text(
                   t.hijriFormatted,
                   textDirection: TextDirection.ltr,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.accentGold,
+                  style: AppTypography.caption(tc).copyWith(
+                    color: tc.accent,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -160,9 +190,9 @@ class _SalahScreenState extends State<SalahScreen> {
               children: [
                 Icon(MdiIcons.calendarMonth,
                     size: SalahLayout.scheduleIconSize,
-                    color: AppColors.textMuted),
+                    color: tc.textMuted),
                 const SizedBox(width: AppSpacing.s8),
-                Text(t.gregorianFormatted, style: AppTypography.caption),
+                Text(t.gregorianFormatted, style: AppTypography.caption(tc)),
               ],
             ),
           ),

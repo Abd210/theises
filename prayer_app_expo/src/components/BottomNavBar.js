@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Spacing, SalahLayout, interFont } from '../theme/theme';
+import { Spacing, SalahLayout, interFont } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 
 const NAV_ITEMS = [
     { icon: 'clock-outline', label: 'Salah' },
@@ -11,24 +12,33 @@ const NAV_ITEMS = [
 ];
 
 export default function BottomNavBar({ activeIndex, onTap }) {
+    const { theme: tc } = useTheme();
     return (
-        <View style={styles.bar}>
+        <View style={[styles.bar, {
+            backgroundColor: tc.navBar,
+            borderColor: tc.cardBorder,
+        }]}>
             {NAV_ITEMS.map((item, i) => {
                 const isActive = i === activeIndex;
                 return (
                     <TouchableOpacity
                         key={item.label}
-                        style={[styles.tab, isActive && styles.activeTab]}
+                        style={[
+                            styles.tab,
+                            isActive && [styles.activeTab, { backgroundColor: tc.accent }],
+                        ]}
                         onPress={() => onTap(i)}
                         activeOpacity={0.7}
                     >
                         <MaterialCommunityIcons
                             name={item.icon}
                             size={isActive ? SalahLayout.pillIconSize : SalahLayout.navInactiveIconSize}
-                            color={isActive ? Colors.backgroundStart : Colors.inactive}
+                            color={isActive ? tc.backgroundStart : tc.inactive}
                         />
                         {isActive && (
-                            <Text style={styles.activeLabel}>{item.label}</Text>
+                            <Text style={[styles.activeLabel, { color: tc.backgroundStart }]}>
+                                {item.label}
+                            </Text>
                         )}
                     </TouchableOpacity>
                 );
@@ -46,10 +56,8 @@ const styles = StyleSheet.create({
         marginHorizontal: SalahLayout.navInsetH,
         marginBottom: SalahLayout.navInsetBottom,
         paddingHorizontal: Spacing.s8,
-        backgroundColor: Colors.navBar,
         borderRadius: SalahLayout.navRadius,
         borderWidth: 1,
-        borderColor: Colors.cardBorder,
     },
     tab: {
         paddingHorizontal: Spacing.s8,
@@ -59,14 +67,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         height: SalahLayout.pillHeight,
-        backgroundColor: Colors.accentGold,
         borderRadius: SalahLayout.pillRadius,
         paddingHorizontal: SalahLayout.pillPaddingH,
     },
     activeLabel: {
         fontFamily: interFont('600'),
         fontSize: SalahLayout.pillTextSize,
-        color: Colors.backgroundStart,
         marginLeft: Spacing.s8,
     },
 });

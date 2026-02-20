@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Colors, Spacing, Radius } from '../theme/theme';
+import { Spacing, Radius } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 
 export default function GlassCard({ children, style }) {
+    const { theme: tc } = useTheme();
     return (
-        <View style={[styles.card, style]}>
+        <View style={[styles.card, { backgroundColor: tc.card, borderColor: tc.cardBorder }, style]}>
             {children}
         </View>
     );
@@ -13,9 +15,7 @@ export default function GlassCard({ children, style }) {
 const styles = StyleSheet.create({
     card: {
         padding: Spacing.s16,
-        backgroundColor: Colors.card,
         borderRadius: Radius.card,
         borderWidth: 1,
-        borderColor: Colors.cardBorder,
     },
 });

@@ -238,3 +238,265 @@ Next prayer row now shows **name + icon + time all in gold** (was: only icon gol
 - `analysis/step1_salah.md` — Step 1 difficulties + all errors encountered + comparison
 
 ---
+
+## Step 2.1 — Settings: Theme Switching ✅
+**Date**: 2026-02-20 | **Status**: Complete
+
+### What was done
+Implemented 4 selectable color themes (Night, Forest, Sand, Midnight Blue) with a Settings screen in both apps. Themes persist across app restarts. All UI components read colors dynamically from a ThemeProvider.
+
+### Architecture
+- **Flutter**: `ChangeNotifier` + `InheritedNotifier` → `ThemeScope.of(context).current` returns `ThemeColors`
+- **Expo**: React Context + `useTheme()` hook returns `{ theme, setTheme }`
+- **Persistence**: SharedPreferences (Flutter) / AsyncStorage (Expo)
+
+### 4 Themes — 10 Color Tokens Each
+
+| Token | Night (default) | Forest | Sand | Midnight Blue |
+|-------|----------------|--------|------|---------------|
+| backgroundStart | `#0D0D0D` | `#0A1A0A` | `#F5F0E8` | `#0A0E1A` |
+| backgroundEnd | `#1A1A2E` | `#1A2E1A` | `#EDE4D3` | `#141E3C` |
+| card | white@15% | white@15% | black@8% | white@15% |
+| textPrimary | `#FFFFFF` | `#FFFFFF` | `#1A1A1A` | `#FFFFFF` |
+| textMuted | `#9E9E9E` | `#8FA88F` | `#7A7060` | `#8E9EC0` |
+| accent | `#D4A847` | `#4CAF50` | `#C49A3C` | `#64B5F6` |
+| navBar | white@20% | white@20% | black@10% | white@20% |
+| inactive | `#6B6B6B` | `#5A6B5A` | `#A09080` | `#5A6B8B` |
+
+### Settings UI
+- Back arrow + "Settings" header
+- "Theme" section with 2×2 grid of theme cards
+- Each card: gradient swatch + accent dot + theme name + checkmark if selected
+- Placeholder sections for Location, Calculation Method, Notifications
+
+### Files Changed
+
+| Flutter (`prayer_app_flutter/lib/`) | Type |
+|-------------------------------------|------|
+| `src/theme/app_themes.dart` | NEW — 4 theme definitions |
+| `src/providers/theme_provider.dart` | NEW — ChangeNotifier + InheritedNotifier |
+| `src/screens/settings_screen.dart` | NEW — Settings UI with theme grid |
+| `src/theme/app_theme.dart` | MODIFIED — static AppColors removed, typography/gradient parameterized |
+| `main.dart` | MODIFIED — ThemeScope wrapper + settings navigation |
+| All 8 components + salah_screen | MODIFIED — use `ThemeScope.of(context).current` |
+
+| Expo (`prayer_app_expo/`) | Type |
+|---------------------------|------|
+| `src/theme/themes.js` | NEW — 4 theme definitions |
+| `src/providers/ThemeProvider.js` | NEW — React Context + AsyncStorage |
+| `src/screens/SettingsScreen.js` | NEW — Settings UI with theme grid |
+| `src/theme/theme.js` | MODIFIED — static Colors removed, getTypography() parameterized |
+| `App.js` | MODIFIED — ThemeProvider wrapper + settings navigation |
+| All 8 components + SalahScreen | MODIFIED — use `useTheme()` hook |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| 4 identical themes (same hex colors) | ✅ | ✅ | ✅ |
+| Theme persistence across restarts | ✅ | ✅ | ✅ |
+| Settings screen layout | ✅ | ✅ | ✅ |
+| 2×2 theme selector grid | ✅ | ✅ | ✅ |
+| Immediate app-wide color update | ✅ | ✅ | ✅ |
+| Status bar adapts to theme brightness | ✅ | ✅ | ✅ |
+| Layout/spacing tokens unchanged | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 2.2 — Location: Permission + City Name ✅
+**Date**: 2026-02-20 | **Status**: Complete
+
+### What was done
+Added location permission, GPS coordinate detection, reverse geocoding (city + country), and persistence. A Location card in Settings shows the detected city, coordinates, source badge (GPS / Default), and a "Detect location" button.
+
+### Architecture
+- **Flutter**: `geolocator` (permission + GPS) + `geocoding` (reverse geocode) → `LocationService` + `LocationNotifier` (ChangeNotifier)
+- **Expo**: `expo-location` (permission + GPS + reverse geocode) → `locationService.js` + React Context (`LocationProvider` in App.js)
+- **Persistence**: SharedPreferences (Flutter) / AsyncStorage (Expo) — 6 keys: lat, lon, city, country, timezone, source
+- **Fallback**: Bucharest (44.4268, 26.1025) if permission denied or GPS fails
+
+### Settings Location Card
+- Map-marker icon + "{city}, {country}" label
+- GPS/Default source badge
+- Coordinates in muted text
+- "Detect location" button with loading spinner
+
+### Header City Name
+SalahScreen `AppHeader` now shows the detected city name dynamically (was hardcoded "Bucharest").
+
+### Files Changed
+
+| Flutter (`prayer_app_flutter/lib/`) | Type |
+|-------------------------------------|------|
+| `src/services/location_service.dart` | NEW — LocationService + LocationNotifier |
+| `src/screens/settings_screen.dart` | MODIFIED — real Location card replaces placeholder |
+| `src/screens/salah_screen.dart` | MODIFIED — dynamic city name via LocationNotifier |
+| `main.dart` | MODIFIED — LocationNotifier created + passed to screens |
+| `pubspec.yaml` | MODIFIED (+geolocator, +geocoding) |
+| `ios/Runner/Info.plist` | MODIFIED (+NSLocationWhenInUseUsageDescription) |
+
+| Expo (`prayer_app_expo/`) | Type |
+|---------------------------|------|
+| `src/services/locationService.js` | NEW — loadSavedLocation + detectLocation |
+| `src/screens/SettingsScreen.js` | MODIFIED — real Location card replaces placeholder |
+| `src/screens/SalahScreen.js` | MODIFIED — dynamic city name via useLocation |
+| `App.js` | MODIFIED — LocationProvider context wrapping app |
+| `package.json` | MODIFIED (+expo-location) |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| Permission request (foreground) | ✅ geolocator | ✅ expo-location | ✅ |
+| GPS coordinate fetch | ✅ | ✅ | ✅ |
+| Reverse geocode (city + country) | ✅ geocoding | ✅ expo-location | ✅ |
+| Fallback to Bucharest | ✅ | ✅ | ✅ |
+| 6-key persistence | ✅ SharedPrefs | ✅ AsyncStorage | ✅ |
+| Location card in Settings | ✅ | ✅ | ✅ |
+| Dynamic city in header | ✅ | ✅ | ✅ |
+| Detect location button | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### How to Test
+```bash
+# Flutter
+cd prayer_app_flutter && flutter run
+# → Settings → Location card shows "Bucharest, Romania" (default)
+# → Tap "Detect location" → accept permission → city updates
+
+# Expo
+cd prayer_app_expo && npx expo start
+# → Same flow via Expo Go
+```
+
+---
+
+## Step 2.2.1 — Timezone Fix: Drop timezonestring from AlAdhan ✅
+**Date**: 2026-02-20 | **Status**: Complete
+
+### Root Cause
+Both prayer APIs were sending `timezonestring=Europe/Bucharest` to AlAdhan even when GPS coords were in San Francisco. The API obeyed the explicit timezone, returning times converted to Bucharest TZ, causing Fajr to show as 15:41 (PM) instead of ~05:41 (AM).
+
+### Fix
+- **Removed `timezonestring` param entirely** from both prayer API URLs
+- AlAdhan auto-detects the correct timezone from latitude/longitude
+- Confirmed via `meta.timezone` in API response (now returns `America/Los_Angeles` for SF coords)
+
+### Sanity Check Added
+Both apps now validate after parsing: `Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha`. If order is wrong, logs the request + meta.timezone and throws "Invalid timing data".
+
+### Other Fixes in This Patch
+- **Auto-detect on first launch**: both apps prompt for location permission at startup (not just from Settings)
+- **Location-aware cache key**: `{date}_{lat}_{lon}` so location changes force refetch
+- **SalahScreen refetch**: listens to location changes and re-loads prayer times
+- **Expo require cycle fixed**: `LocationProvider` extracted to `src/providers/LocationProvider.js`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `prayer_api.dart` | Remove `timezonestring`, add sanity check, location-aware cache key |
+| `prayerApi.js` | Same |
+| `location_service.dart` | Device timezone detection (for persistence, no longer sent to API) |
+| `locationService.js` | Same |
+| `LocationProvider.js` (NEW) | Extracted from App.js to break require cycle |
+| `main.dart` | Auto-detect on first launch |
+| `salah_screen.dart` | Refetch on location change |
+| `SalahScreen.js` | Same |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### Known Issue
+Flutter on iOS 26 simulator crashes with `objective_c.framework` error from `geolocator` package. This is a known simulator compatibility issue, not a code bug. Works on physical device.
+
+---
+
+## Step 2.3 — Prayer Settings: Method + Madhab (Store Only) ✅
+**Date**: 2026-02-20 | **Status**: Complete
+
+### What Changed
+Added "Prayer Settings" section to Settings screen in BOTH apps with two selectors:
+1. **Calculation Method** — ISNA, MWL (default), Umm al-Qura, Egyptian
+2. **Madhab (Asr)** — Shafi/Standard (default), Hanafi
+
+Values are persisted and survive app restart. **Not wired into Salah API** — that's Step 2.4.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `prayer_settings_service.dart` (NEW) | Persistence + `PrayerSettingsNotifier` (ChangeNotifier) |
+| `prayerSettingsService.js` (NEW) | Persistence (AsyncStorage), option arrays, label helpers |
+| `PrayerSettingsProvider.js` (NEW) | React Context + `usePrayerSettings()` hook |
+| `settings_screen.dart` | Replaced "Calculation Method" placeholder with real glass card + modal bottom sheet |
+| `SettingsScreen.js` | Same — replaced placeholder with glass card + slide-up Modal |
+| `main.dart` | Create/load `PrayerSettingsNotifier`, pass to SettingsScreen |
+| `App.js` | Wrap with `PrayerSettingsProvider` |
+
+### How to Test Persistence
+1. Open Settings → Change Method to "Umm al-Qura" and Madhab to "Hanafi"
+2. Kill and restart the app
+3. Open Settings → values should still show "Umm al-Qura" / "Hanafi"
+4. Check console for `[PrayerSettings] methodId set to 4` / `school set to 1`
+
+### Parity Check
+| Aspect | Flutter | Expo |
+|--------|---------|------|
+| Method options | 4 (ISNA, MWL, Umm al-Qura, Egyptian) | Same ✅ |
+| School options | 2 (Shafi, Hanafi) | Same ✅ |
+| Default method | 3 (MWL) | Same ✅ |
+| Default school | 0 (Shafi) | Same ✅ |
+| Picker UI | Modal bottom sheet | Slide-up Modal ✅ |
+| Persistence | SharedPreferences | AsyncStorage ✅ |
+| Salah screen | Unchanged | Unchanged ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+---
+
+## Step 2.4 — Offsets (Store Only) + Modal Fix ✅
+**Date**: 2026-02-20 | **Status**: Complete
+
+### What Changed
+1. **Time Adjustments UI** — Added a new section under Prayer Settings with rows for Fajr, Dhuhr, Asr, Maghrib, Isha.
+   - Controls: `[-] [Reset] [+]` (1 min steps, range -30 to +30).
+   - Values are persisted to `SharedPreferences` (Flutter) and `AsyncStorage` (Expo).
+2. **Fixed Modal Parity** — Redesigned the selection sheet/modal to match exactly in both apps:
+   - **Background**: Solid glass card (card color at 0.96 opacity).
+   - **Height**: Fixed at 45% of screen height.
+   - **Radius**: 24 on top corners.
+   - **Grabber**: Small pill at top center.
+   - **Backdrop**: 0.35 dim overlay.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `prayer_settings_service.dart` | Added `loadOffsets`, `setOffset`, and `offsets` getter. |
+| `prayerSettingsService.js` | Added `loadOffsets`, `setOffset`. |
+| `PrayerSettingsProvider.js` | Added `offsets` state and `setOffset` method. |
+| `settings_screen.dart` | Added `Time Adjustments` UI + fixed `_OptionSheet` spec. |
+| `SettingsScreen.js` | Added `Time Adjustments` UI + fixed Modal spec. |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### Parity Check
+| Aspect | Flutter | Expo |
+|--------|---------|------|
+| Offset Range | -30 to +30 | Same ✅ |
+| Modal Height | 45% Screen | Same ✅ |
+| Modal Opacity | 0.96 (Solid Card) | Same ✅ |
+| Modal Radius | 24 | Same ✅ |
+| Controls | `[-] [Reset] [+]` | Same ✅ |
+
+---

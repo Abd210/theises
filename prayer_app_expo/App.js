@@ -10,10 +10,14 @@ import {
     Inter_700Bold,
     Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
-import { Colors, Typography } from './src/theme/theme';
+import { getTypography } from './src/theme/theme';
+import { ThemeProvider, useTheme } from './src/providers/ThemeProvider';
+import { LocationProvider } from './src/providers/LocationProvider';
+import { PrayerSettingsProvider } from './src/providers/PrayerSettingsProvider';
 import ScreenContainer from './src/components/ScreenContainer';
 import BottomNavBar from './src/components/BottomNavBar';
 import SalahScreen from './src/screens/SalahScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 // ── Disable font scaling globally for benchmark fairness ──
 if (Text.defaultProps == null) Text.defaultProps = {};
@@ -22,8 +26,6 @@ if (TextInput.defaultProps == null) TextInput.defaultProps = {};
 TextInput.defaultProps.allowFontScaling = false;
 
 export default function App() {
-    const [activeTab, setActiveTab] = useState(0);
-
     const [fontsLoaded] = useFonts({
         Inter_400Regular,
         Inter_500Medium,
@@ -35,32 +37,60 @@ export default function App() {
     if (!fontsLoaded) {
         return (
             <View style={styles.loading}>
-                <ActivityIndicator color={Colors.accentGold} size="large" />
+                <ActivityIndicator color="#D4A847" size="large" />
             </View>
         );
     }
 
+    return (
+        <SafeAreaProvider>
+            <ThemeProvider>
+                <LocationProvider>
+                    <PrayerSettingsProvider>
+                        <AppContent />
+                    </PrayerSettingsProvider>
+                </LocationProvider>
+            </ThemeProvider>
+        </SafeAreaProvider>
+    );
+}
+
+function AppContent() {
+    const { theme: tc } = useTheme();
+    const typo = getTypography(tc);
+    const [activeTab, setActiveTab] = useState(0);
+    const [showSettings, setShowSettings] = useState(false);
+
     const renderScreen = () => {
+        if (showSettings) {
+            return <SettingsScreen onBack={() => setShowSettings(false)} />;
+        }
         switch (activeTab) {
             case 0:
-                return <SalahScreen />;
+                return <SalahScreen onSettingsTap={() => setShowSettings(true)} />;
             default:
                 return (
                     <View style={styles.placeholder}>
-                        <Text style={Typography.body}>Coming soon</Text>
+                        <Text style={typo.body}>Coming soon</Text>
                     </View>
                 );
         }
     };
 
     return (
-        <SafeAreaProvider>
-            <StatusBar style="light" />
+        <>
+            <StatusBar style={tc.brightness === 'dark' ? 'light' : 'dark'} />
             <ScreenContainer>
                 <View style={styles.content}>{renderScreen()}</View>
-                <BottomNavBar activeIndex={activeTab} onTap={setActiveTab} />
+                <BottomNavBar
+                    activeIndex={activeTab}
+                    onTap={(i) => {
+                        setActiveTab(i);
+                        setShowSettings(false);
+                    }}
+                />
             </ScreenContainer>
-        </SafeAreaProvider>
+        </>
     );
 }
 
@@ -71,6 +101,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: Colors.backgroundStart,
+        backgroundColor: '#0D0D0D',
     },
 });

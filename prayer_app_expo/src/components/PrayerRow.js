@@ -1,15 +1,28 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, SalahLayout, interFont, getPrayerIcon } from '../theme/theme';
+import { SalahLayout, interFont, getPrayerIcon } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 
 export default function PrayerRow({ name, time, isHighlighted = false }) {
-    const textColor = isHighlighted ? Colors.accentGold : Colors.textPrimary;
-    const iconColor = isHighlighted ? Colors.accentGold : Colors.textMuted;
+    const { theme: tc } = useTheme();
+    const textColor = isHighlighted ? tc.accent : tc.textPrimary;
+    const iconColor = isHighlighted ? tc.accent : tc.textMuted;
     const iconName = getPrayerIcon(name);
 
+    const borderColor = isHighlighted
+        ? hexToRgba(tc.accent, SalahLayout.rowBorderOpacity)
+        : 'transparent';
+
     return (
-        <View style={[styles.row, isHighlighted && styles.highlighted]}>
+        <View style={[
+            styles.row,
+            isHighlighted && {
+                backgroundColor: tc.card,
+                borderWidth: SalahLayout.rowBorderWidth,
+                borderColor: borderColor,
+            },
+        ]}>
             <MaterialCommunityIcons
                 name={iconName}
                 size={SalahLayout.rowIconSize}
@@ -22,6 +35,14 @@ export default function PrayerRow({ name, time, isHighlighted = false }) {
     );
 }
 
+function hexToRgba(hex, alpha) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const styles = StyleSheet.create({
     row: {
         flexDirection: 'row',
@@ -29,11 +50,6 @@ const styles = StyleSheet.create({
         height: SalahLayout.rowHeight,
         paddingHorizontal: SalahLayout.rowPaddingH,
         borderRadius: SalahLayout.rowRadius,
-    },
-    highlighted: {
-        backgroundColor: Colors.card,
-        borderWidth: SalahLayout.rowBorderWidth,
-        borderColor: `rgba(212, 168, 71, ${SalahLayout.rowBorderOpacity})`,
     },
     name: {
         fontFamily: interFont('500'),

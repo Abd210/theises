@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 class ScreenContainer extends StatelessWidget {
   final Widget child;
@@ -8,8 +9,9 @@ class ScreenContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
     return Container(
-      decoration: const BoxDecoration(gradient: appBackgroundGradient),
+      decoration: BoxDecoration(gradient: appBackgroundGradient(tc)),
       child: SafeArea(bottom: false, child: child),
     );
   }

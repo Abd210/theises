@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 import 'app_icon_button.dart';
 
 class AppHeader extends StatelessWidget {
@@ -11,6 +12,7 @@ class AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
       child: Row(
@@ -20,13 +22,13 @@ class AppHeader extends StatelessWidget {
             children: [
               Icon(
                 MdiIcons.mapMarker,
-                color: AppColors.accentGold,
+                color: tc.accent,
                 size: SalahLayout.locationIconSize,
               ),
               const SizedBox(width: AppSpacing.s8),
               Text(
                 title,
-                style: AppTypography.body.copyWith(
+                style: AppTypography.body(tc).copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),

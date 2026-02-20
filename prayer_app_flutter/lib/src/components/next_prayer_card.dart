@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 class NextPrayerCard extends StatelessWidget {
   final String name;
@@ -16,14 +17,15 @@ class NextPrayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
     return Container(
       constraints: const BoxConstraints(minHeight: SalahLayout.heroMinHeight),
       padding: const EdgeInsets.all(SalahLayout.heroPadding),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: tc.card,
         borderRadius: BorderRadius.circular(SalahLayout.heroRadius),
         border: Border.all(
-          color: AppColors.accentGold.withValues(alpha: SalahLayout.heroBorderOpacity),
+          color: tc.accent.withValues(alpha: SalahLayout.heroBorderOpacity),
           width: SalahLayout.heroBorderWidth,
         ),
       ),
@@ -34,12 +36,12 @@ class NextPrayerCard extends StatelessWidget {
             width: SalahLayout.heroIconBoxSize,
             height: SalahLayout.heroIconBoxSize,
             decoration: BoxDecoration(
-              color: AppColors.accentGold,
+              color: tc.accent,
               borderRadius: BorderRadius.circular(SalahLayout.heroIconBoxRadius),
             ),
             child: Icon(
               MdiIcons.mosque,
-              color: AppColors.backgroundStart,
+              color: tc.backgroundStart,
               size: SalahLayout.heroIconSize,
             ),
           ),
@@ -52,10 +54,10 @@ class NextPrayerCard extends StatelessWidget {
               children: [
                 Text(
                   'Next Prayer: ${name.toUpperCase()}',
-                  style: AppTypography.body.copyWith(
+                  style: AppTypography.body(tc).copyWith(
                     fontSize: SalahLayout.heroLine1Size,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: tc.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -65,17 +67,17 @@ class NextPrayerCard extends StatelessWidget {
                   children: [
                     Text(
                       'Starts in ',
-                      style: AppTypography.caption.copyWith(
+                      style: AppTypography.caption(tc).copyWith(
                         fontSize: SalahLayout.heroLine1Size,
-                        color: AppColors.textMuted,
+                        color: tc.textMuted,
                       ),
                     ),
                     Text(
                       countdown,
-                      style: AppTypography.titleLarge.copyWith(
+                      style: AppTypography.titleLarge(tc).copyWith(
                         fontSize: SalahLayout.heroCountdownSize,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: tc.textPrimary,
                       ),
                     ),
                   ],
@@ -83,9 +85,9 @@ class NextPrayerCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Adhan at $adhanTime',
-                  style: AppTypography.caption.copyWith(
+                  style: AppTypography.caption(tc).copyWith(
                     fontSize: SalahLayout.heroLine3Size,
-                    color: AppColors.textMuted,
+                    color: tc.textMuted,
                   ),
                 ),
               ],

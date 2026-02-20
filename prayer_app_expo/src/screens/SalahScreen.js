@@ -3,12 +3,14 @@ import {
     View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography, SalahLayout, interFont, getPrayerIcon } from '../theme/theme';
+import { Spacing, SalahLayout, interFont, getPrayerIcon, getTypography } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 import AppHeader from '../components/AppHeader';
 import NextPrayerCard from '../components/NextPrayerCard';
 import PrayerRow from '../components/PrayerRow';
 import AppDivider from '../components/AppDivider';
 import { fetchPrayerTimes } from '../services/prayerApi';
+import { useLocation } from '../providers/LocationProvider';
 
 // ── helpers ──
 function cleanTime(raw) {
@@ -38,7 +40,10 @@ function padTwo(n) {
     return n.toString().padStart(2, '0');
 }
 
-export default function SalahScreen() {
+export default function SalahScreen({ onSettingsTap }) {
+    const { theme: tc } = useTheme();
+    const { location } = useLocation();
+    const typo = getTypography(tc);
     const [timings, setTimings] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -90,7 +95,7 @@ export default function SalahScreen() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [location]);
 
     useEffect(() => {
         load();
@@ -105,7 +110,7 @@ export default function SalahScreen() {
     if (loading && !timings) {
         return (
             <View style={styles.center}>
-                <ActivityIndicator color={Colors.accentGold} size="large" />
+                <ActivityIndicator color={tc.accent} size="large" />
             </View>
         );
     }
@@ -113,7 +118,7 @@ export default function SalahScreen() {
     if (!timings) {
         return (
             <View style={styles.center}>
-                <Text style={Typography.caption}>{error || 'Unknown error'}</Text>
+                <Text style={typo.caption}>{error || 'Unknown error'}</Text>
             </View>
         );
     }
@@ -148,27 +153,30 @@ export default function SalahScreen() {
                 <RefreshControl
                     refreshing={loading}
                     onRefresh={load}
-                    tintColor={Colors.accentGold}
+                    tintColor={tc.accent}
                 />
             }
         >
             {/* Header */}
             <View style={{ height: SalahLayout.headerMarginTop }} />
-            <AppHeader title="Bucharest" />
+            <AppHeader
+                title={location ? (location.country ? `${location.city}, ${location.country}` : location.city) : 'Bucharest'}
+                onSettingsTap={onSettingsTap}
+            />
             <View style={{ height: SalahLayout.headerMarginBottom }} />
 
             {/* Error */}
             {error && (
-                <View style={styles.errorBanner}>
-                    <Text style={Typography.caption}>{error}</Text>
+                <View style={[styles.errorBanner, { backgroundColor: tc.card }]}>
+                    <Text style={typo.caption}>{error}</Text>
                 </View>
             )}
 
             {/* Date row */}
             <View style={{ height: SalahLayout.dateRowMarginTop }} />
             <View style={styles.dateRow}>
-                <Text style={Typography.caption}>{timings.gregFormatted}</Text>
-                <Text style={styles.hijriText}>{timings.hijriFormatted}</Text>
+                <Text style={typo.caption}>{timings.gregFormatted}</Text>
+                <Text style={[styles.hijriText, { color: tc.accent }]}>{timings.hijriFormatted}</Text>
             </View>
             <View style={{ height: SalahLayout.dateRowMarginBottom }} />
 
@@ -187,9 +195,9 @@ export default function SalahScreen() {
                 <MaterialCommunityIcons
                     name="calendar-month"
                     size={SalahLayout.scheduleIconSize}
-                    color={Colors.textMuted}
+                    color={tc.textMuted}
                 />
-                <Text style={[Typography.caption, { marginLeft: Spacing.s8 }]}>
+                <Text style={[typo.caption, { marginLeft: Spacing.s8 }]}>
                     {timings.gregFormatted}
                 </Text>
             </View>
@@ -243,13 +251,11 @@ const styles = StyleSheet.create({
     hijriText: {
         fontFamily: interFont('600'),
         fontSize: 13,
-        color: Colors.accentGold,
     },
     row: { flexDirection: 'row', alignItems: 'center' },
     errorBanner: {
         marginHorizontal: SalahLayout.screenPadding,
         padding: Spacing.s8,
-        backgroundColor: Colors.card,
         borderRadius: Spacing.s8,
     },
 });

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 class PrayerRow extends StatelessWidget {
   final String name;
@@ -17,18 +18,19 @@ class PrayerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isHighlighted ? AppColors.accentGold : AppColors.textPrimary;
-    final iconColor = isHighlighted ? AppColors.accentGold : AppColors.textMuted;
+    final tc = ThemeScope.of(context).current;
+    final textColor = isHighlighted ? tc.accent : tc.textPrimary;
+    final iconColor = isHighlighted ? tc.accent : tc.textMuted;
 
     return Container(
       height: SalahLayout.rowHeight,
       padding: const EdgeInsets.symmetric(horizontal: SalahLayout.rowPaddingH),
       decoration: BoxDecoration(
-        color: isHighlighted ? AppColors.card : Colors.transparent,
+        color: isHighlighted ? tc.card : Colors.transparent,
         borderRadius: BorderRadius.circular(SalahLayout.rowRadius),
         border: isHighlighted
             ? Border.all(
-                color: AppColors.accentGold.withValues(alpha: SalahLayout.rowBorderOpacity),
+                color: tc.accent.withValues(alpha: SalahLayout.rowBorderOpacity),
                 width: SalahLayout.rowBorderWidth,
               )
             : null,
@@ -39,7 +41,7 @@ class PrayerRow extends StatelessWidget {
           const SizedBox(width: SalahLayout.rowPaddingH),
           Text(
             name,
-            style: AppTypography.body.copyWith(
+            style: AppTypography.body(tc).copyWith(
               fontSize: SalahLayout.rowTextSize,
               fontWeight: FontWeight.w500,
               color: textColor,
@@ -48,7 +50,7 @@ class PrayerRow extends StatelessWidget {
           const Spacer(),
           Text(
             time,
-            style: AppTypography.body.copyWith(
+            style: AppTypography.body(tc).copyWith(
               fontSize: SalahLayout.rowTextSize,
               fontWeight: FontWeight.w500,
               color: textColor,

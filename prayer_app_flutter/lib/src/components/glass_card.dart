@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -9,12 +10,13 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
     return Container(
       padding: padding ?? const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: tc.card,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.cardBorder, width: 1),
+        border: Border.all(color: tc.cardBorder, width: 1),
       ),
       child: child,
     );

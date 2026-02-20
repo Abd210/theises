@@ -1,18 +1,5 @@
-// ───────────────────────────────────────────────
-// COLORS
-// ───────────────────────────────────────────────
-export const Colors = {
-    backgroundStart: '#0D0D0D',
-    backgroundEnd: '#1A1A2E',
-    card: 'rgba(255, 255, 255, 0.15)',
-    cardBorder: 'rgba(255, 255, 255, 0.10)',
-    textPrimary: '#FFFFFF',
-    textMuted: '#9E9E9E',
-    accentGold: '#D4A847',
-    navBar: 'rgba(255, 255, 255, 0.20)',
-    inactive: '#6B6B6B',
-    iconButtonBg: 'rgba(255, 255, 255, 0.18)',
-};
+// theme.js — Non-color tokens that stay the same across all themes.
+// Colors are now dynamic via ThemeProvider. Use useTheme() to get current colors.
 
 // ───────────────────────────────────────────────
 // SPACING (8-pt grid)
@@ -37,6 +24,7 @@ export const Radius = {
 
 // ───────────────────────────────────────────────
 // SALAH LAYOUT  (pixel-perfect checklist tokens)
+// Same across all themes — only colors change.
 // ───────────────────────────────────────────────
 export const SalahLayout = {
     // Screen
@@ -132,27 +120,29 @@ export function interFont(weight = '400') {
 }
 
 // ───────────────────────────────────────────────
-// TYPOGRAPHY
+// TYPOGRAPHY (functions that take theme colors)
 // ───────────────────────────────────────────────
-export const Typography = {
-    titleLarge: {
-        fontFamily: interFont('700'),
-        fontSize: 28,
-        color: Colors.textPrimary,
-    },
-    titleMedium: {
-        fontFamily: interFont('600'),
-        fontSize: 20,
-        color: Colors.textPrimary,
-    },
-    body: {
-        fontFamily: interFont('400'),
-        fontSize: 16,
-        color: Colors.textPrimary,
-    },
-    caption: {
-        fontFamily: interFont('400'),
-        fontSize: 13,
-        color: Colors.textMuted,
-    },
-};
+export function getTypography(tc) {
+    return {
+        titleLarge: {
+            fontFamily: interFont('700'),
+            fontSize: 28,
+            color: tc.textPrimary,
+        },
+        titleMedium: {
+            fontFamily: interFont('600'),
+            fontSize: 20,
+            color: tc.textPrimary,
+        },
+        body: {
+            fontFamily: interFont('400'),
+            fontSize: 16,
+            color: tc.textPrimary,
+        },
+        caption: {
+            fontFamily: interFont('400'),
+            fontSize: 13,
+            color: tc.textMuted,
+        },
+    };
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 
 class BottomNavBarItem {
   final IconData icon;
@@ -28,6 +29,7 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeScope.of(context).current;
     return Container(
       height: SalahLayout.navHeight,
       margin: EdgeInsets.fromLTRB(
@@ -38,9 +40,9 @@ class BottomNavBar extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
       decoration: BoxDecoration(
-        color: AppColors.navBar,
+        color: tc.navBar,
         borderRadius: BorderRadius.circular(SalahLayout.navRadius),
-        border: Border.all(color: AppColors.cardBorder, width: 1),
+        border: Border.all(color: tc.cardBorder, width: 1),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -52,6 +54,7 @@ class BottomNavBar extends StatelessWidget {
             label: item.label,
             isActive: isActive,
             onTap: () => onTap(i),
+            tc: tc,
           );
         }),
       ),
@@ -64,12 +67,14 @@ class _NavTab extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final dynamic tc;
 
   const _NavTab({
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
+    required this.tc,
   });
 
   @override
@@ -81,19 +86,19 @@ class _NavTab extends StatelessWidget {
           height: SalahLayout.pillHeight,
           padding: const EdgeInsets.symmetric(horizontal: SalahLayout.pillPaddingH),
           decoration: BoxDecoration(
-            color: AppColors.accentGold,
+            color: tc.accent,
             borderRadius: BorderRadius.circular(SalahLayout.pillRadius),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: AppColors.backgroundStart, size: SalahLayout.pillIconSize),
+              Icon(icon, color: tc.backgroundStart, size: SalahLayout.pillIconSize),
               const SizedBox(width: AppSpacing.s8),
               Text(
                 label,
-                style: AppTypography.caption.copyWith(
+                style: AppTypography.caption(tc).copyWith(
                   fontSize: SalahLayout.pillTextSize,
-                  color: AppColors.backgroundStart,
+                  color: tc.backgroundStart,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -109,7 +114,7 @@ class _NavTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s8, vertical: AppSpacing.s8,
         ),
-        child: Icon(icon, color: AppColors.inactive, size: SalahLayout.navInactiveIconSize),
+        child: Icon(icon, color: tc.inactive, size: SalahLayout.navInactiveIconSize),
       ),
     );
   }

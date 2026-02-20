@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Colors } from '../theme/theme';
+import { useTheme } from '../providers/ThemeProvider';
 
 export default function AppDivider() {
-    return <View style={styles.divider} />;
+    const { theme: tc } = useTheme();
+    return <View style={[styles.divider, { backgroundColor: tc.cardBorder }]} />;
 }
 
 const styles = StyleSheet.create({
     divider: {
         height: 1,
-        backgroundColor: Colors.cardBorder,
     },
 });

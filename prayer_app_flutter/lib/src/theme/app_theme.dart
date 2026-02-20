@@ -1,27 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'app_themes.dart';
 
 // ───────────────────────────────────────────────
-// COLORS
-// ───────────────────────────────────────────────
-class AppColors {
-  AppColors._();
-
-  static const Color backgroundStart = Color(0xFF0D0D0D);
-  static const Color backgroundEnd = Color(0xFF1A1A2E);
-  static const Color card = Color(0x26FFFFFF); // ~15 % white
-  static const Color cardBorder = Color(0x1AFFFFFF); // ~10 % white
-  static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textMuted = Color(0xFF9E9E9E);
-  static const Color accentGold = Color(0xFFD4A847);
-  static const Color navBar = Color(0x33FFFFFF); // ~20 % white
-  static const Color inactive = Color(0xFF6B6B6B);
-  static const Color iconButtonBg = Color.fromRGBO(255, 255, 255, 0.18);
-}
-
-// ───────────────────────────────────────────────
-// SPACING (8-pt grid)
+// SPACING (8-pt grid) — same across all themes
 // ───────────────────────────────────────────────
 class AppSpacing {
   AppSpacing._();
@@ -35,7 +18,7 @@ class AppSpacing {
 }
 
 // ───────────────────────────────────────────────
-// RADIUS
+// RADIUS — same across all themes
 // ───────────────────────────────────────────────
 class AppRadius {
   AppRadius._();
@@ -47,6 +30,7 @@ class AppRadius {
 
 // ───────────────────────────────────────────────
 // SALAH LAYOUT  (pixel-perfect checklist tokens)
+// Same across all themes — only colors change.
 // ───────────────────────────────────────────────
 class SalahLayout {
   SalahLayout._();
@@ -133,55 +117,68 @@ class PrayerIcons {
 
 // ───────────────────────────────────────────────
 // TYPOGRAPHY  (Inter via google_fonts)
+// Colors are set per-widget using theme; defaults to white.
 // ───────────────────────────────────────────────
 class AppTypography {
   AppTypography._();
 
-  static final TextStyle titleLarge = GoogleFonts.inter(
+  static TextStyle titleLarge(ThemeColors tc) => GoogleFonts.inter(
     fontSize: 28,
     fontWeight: FontWeight.w700,
-    color: AppColors.textPrimary,
+    color: tc.textPrimary,
   );
 
-  static final TextStyle titleMedium = GoogleFonts.inter(
+  static TextStyle titleMedium(ThemeColors tc) => GoogleFonts.inter(
     fontSize: 20,
     fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
+    color: tc.textPrimary,
   );
 
-  static final TextStyle body = GoogleFonts.inter(
+  static TextStyle body(ThemeColors tc) => GoogleFonts.inter(
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
+    color: tc.textPrimary,
   );
 
-  static final TextStyle caption = GoogleFonts.inter(
+  static TextStyle caption(ThemeColors tc) => GoogleFonts.inter(
     fontSize: 13,
     fontWeight: FontWeight.w400,
-    color: AppColors.textMuted,
+    color: tc.textMuted,
   );
 }
 
 // ───────────────────────────────────────────────
-// GRADIENT
+// GRADIENT (dynamic per theme)
 // ───────────────────────────────────────────────
-const LinearGradient appBackgroundGradient = LinearGradient(
+LinearGradient appBackgroundGradient(ThemeColors tc) => LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
-  colors: [AppColors.backgroundStart, AppColors.backgroundEnd],
+  colors: [tc.backgroundStart, tc.backgroundEnd],
 );
 
 // ───────────────────────────────────────────────
-// MATERIAL THEME
+// MATERIAL THEME (dynamic per theme)
 // ───────────────────────────────────────────────
-ThemeData appThemeData() {
+ThemeData appThemeData(ThemeColors tc) {
+  final base = tc.brightness == Brightness.dark
+      ? ThemeData.dark()
+      : ThemeData.light();
   return ThemeData(
-    brightness: Brightness.dark,
-    scaffoldBackgroundColor: AppColors.backgroundStart,
-    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-    colorScheme: const ColorScheme.dark(
-      primary: AppColors.accentGold,
-      surface: AppColors.backgroundStart,
+    brightness: tc.brightness,
+    scaffoldBackgroundColor: tc.backgroundStart,
+    textTheme: GoogleFonts.interTextTheme(base.textTheme),
+    colorScheme: ColorScheme(
+      brightness: tc.brightness,
+      primary: tc.accent,
+      onPrimary: tc.brightness == Brightness.dark
+          ? tc.backgroundStart
+          : Colors.white,
+      surface: tc.backgroundStart,
+      onSurface: tc.textPrimary,
+      secondary: tc.accent,
+      onSecondary: tc.backgroundStart,
+      error: Colors.red,
+      onError: Colors.white,
     ),
   );
 }
