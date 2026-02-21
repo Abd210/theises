@@ -17,6 +17,7 @@ import { PrayerSettingsProvider } from './src/providers/PrayerSettingsProvider';
 import ScreenContainer from './src/components/ScreenContainer';
 import BottomNavBar from './src/components/BottomNavBar';
 import SalahScreen from './src/screens/SalahScreen';
+import QiblaScreen from './src/screens/QiblaScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 // ── Disable font scaling globally for benchmark fairness ──
@@ -68,6 +69,8 @@ function AppContent() {
         switch (activeTab) {
             case 0:
                 return <SalahScreen onSettingsTap={() => setShowSettings(true)} />;
+            case 1:
+                return <QiblaScreen />;
             default:
                 return (
                     <View style={styles.placeholder}>

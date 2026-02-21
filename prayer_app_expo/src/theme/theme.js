@@ -89,6 +89,42 @@ export const SalahLayout = {
 };
 
 // ───────────────────────────────────────────────
+// QIBLA LAYOUT  (pixel-perfect checklist tokens)
+// ───────────────────────────────────────────────
+export const QiblaLayout = {
+    screenPadding: 20,
+    titleMarginTop: 12,
+
+    // City row
+    cityIconSize: 16,
+    cityFontSize: 13,
+
+    // Big degree
+    degreeFontSize: 48,
+    degreeSubtitleSize: 13,
+
+    // Compass
+    compassSize: 260,
+    compassStroke: 2,
+    tickLength: 10,
+    tickLengthMajor: 16,
+    cardinalFontSize: 14,
+    needleWidth: 3,
+    centerDotRadius: 5,
+    kaabaIconSize: 22,
+    pointerSize: 10,
+
+    // Status text
+    statusFontSize: 14,
+
+    // Kaaba card
+    cardPadding: 16,
+    cardRadius: 18,
+    arabicFontSize: 22,
+    translitFontSize: 13,
+};
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 export const PrayerIcons = {

@@ -1,0 +1,59 @@
+[
+    {
+        "id": "morning",
+        "name": "Morning Azkar",
+        "icon": "weather-sunny",
+        "items": [
+            {
+                "id": "m1",
+                "arabic": "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+                "translation": "We have reached the morning and at this very time unto Allah belongs all sovereignty, and all praise is for Allah. None has the right to be worshipped except Allah, alone, without partner.",
+                "target": 1
+            },
+            {
+                "id": "m2",
+                "arabic": "سُبْحَانَ اللهِ وَبِحَمْدِهِ: عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ",
+                "translation": "Glory is to Allah and praise is to Him, by the multitude of His creation, by His Pleasure, by the weight of His Throne, and by the extent of His Words.",
+                "target": 3
+            }
+        ]
+    },
+    {
+        "id": "evening",
+        "name": "Evening Azkar",
+        "icon": "weather-night",
+        "items": [
+            {
+                "id": "e1",
+                "arabic": "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+                "translation": "We have reached the evening and at this very time unto Allah belongs all sovereignty, and all praise is for Allah.",
+                "target": 1
+            }
+        ]
+    },
+    {
+        "id": "tasbih",
+        "name": "After Salah",
+        "icon": "prayer",
+        "items": [
+            {
+                "id": "t1",
+                "arabic": "سُبْحَانَ اللهِ",
+                "translation": "Glory be to Allah",
+                "target": 33
+            },
+            {
+                "id": "t2",
+                "arabic": "الْحَمْدُ لِلَّهِ",
+                "translation": "Praise be to Allah",
+                "target": 33
+            },
+            {
+                "id": "t3",
+                "arabic": "اللهُ أَكْبَرُ",
+                "translation": "Allah is the Greatest",
+                "target": 33
+            }
+        ]
+    }
+]

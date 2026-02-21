@@ -41,6 +41,7 @@ dependencies:
   material_design_icons_flutter: ^7.0.7296
   geolocator: ^13.0.2
   geocoding: ^3.0.0
+  flutter_compass: ^0.8.1
 
 dev_dependencies:
   flutter_test:

@@ -7,6 +7,7 @@ import 'src/services/prayer_settings_service.dart';
 import 'src/components/screen_container.dart';
 import 'src/components/bottom_nav_bar.dart';
 import 'src/screens/salah_screen.dart';
+import 'src/screens/qibla_screen.dart';
 import 'src/screens/settings_screen.dart';
 
 /// Global providers — created once, persist across the app.
@@ -109,6 +110,8 @@ class _AppShellState extends State<AppShell> {
           locationNotifier: locationNotifier,
           prayerSettingsNotifier: prayerSettingsNotifier,
         );
+      case 1:
+        return QiblaScreen(locationNotifier: locationNotifier);
       default:
         return Center(
           child: Text('Coming soon', style: AppTypography.body(tc)),

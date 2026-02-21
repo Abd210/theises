@@ -97,6 +97,44 @@ class SalahLayout {
 }
 
 // ───────────────────────────────────────────────
+// QIBLA LAYOUT  (pixel-perfect checklist tokens)
+// ───────────────────────────────────────────────
+class QiblaLayout {
+  QiblaLayout._();
+
+  static const double screenPadding = 20;
+  static const double titleMarginTop = 12;
+
+  // City row
+  static const double cityIconSize = 16;
+  static const double cityFontSize = 13;
+
+  // Big degree
+  static const double degreeFontSize = 48;
+  static const double degreeSubtitleSize = 13;
+
+  // Compass
+  static const double compassSize = 260;
+  static const double compassStroke = 2.0;
+  static const double tickLength = 10;
+  static const double tickLengthMajor = 16;
+  static const double cardinalFontSize = 14;
+  static const double needleWidth = 3.0;
+  static const double centerDotRadius = 5.0;
+  static const double kaabaIconSize = 22;
+  static const double pointerSize = 10;
+
+  // Status text
+  static const double statusFontSize = 14;
+
+  // Kaaba card
+  static const double cardPadding = 16;
+  static const double cardRadius = 18;
+  static const double arabicFontSize = 22;
+  static const double translitFontSize = 13;
+}
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 class PrayerIcons {

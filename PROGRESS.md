@@ -621,3 +621,147 @@ Expanded the calculation method picker from 4 to 8 options. Added a `methodMode`
 4. Manually pick a method → toggle switches to OFF
 
 ---
+
+## Step 3 — Qibla Screen (UI + Static Bearing) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Built the Qibla screen with a static compass UI and bearing calculation in both Flutter and Expo. No device sensors — just geometric computation.
+
+### Qibla Formula
+```
+Kaaba: lat=21.4225, lon=39.8262
+Δlon = kaabaLon - userLon
+y = sin(Δlon) * cos(kaabaLat)
+x = cos(userLat)*sin(kaabaLat) - sin(userLat)*cos(kaabaLat)*cos(Δlon)
+bearing = atan2(y,x) → degrees → normalize 0..360
+```
+
+### Screen Components
+1. Title "Qibla"
+2. City row with pin icon
+3. Big degree value (accent, 48px)
+4. "from North" subtitle
+5. Compass dial with tick marks, N/E/S/W labels, needle, pointer, Kaaba marker
+6. Status text with accent degree
+7. Kaaba glass card (Arabic + transliteration)
+
+### Files Changed
+
+| Flutter | Change |
+|---------|--------|
+| `qibla_service.dart` | [NEW] `computeQiblaDegrees()` |
+| `qibla_screen.dart` | [NEW] Full Qibla screen + `_CompassPainter` |
+| `app_theme.dart` | Added `QiblaLayout` tokens |
+| `main.dart` | Wired tab index 1 |
+
+| Expo | Change |
+|------|--------|
+| `qiblaService.js` | [NEW] `computeQiblaDegrees()` |
+| `QiblaScreen.js` | [NEW] Full Qibla screen + SVG `CompassDial` |
+| `theme.js` | Added `QiblaLayout` tokens |
+| `App.js` | Wired tab index 1 |
+| `package.json` | Added `react-native-svg` |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### How to Test
+1. Tap Qibla tab → compass + bearing displayed
+2. Bucharest (default) → ~149.4° from North
+3. Change simulator location → degree changes accordingly
+4. Salah screen unchanged
+
+---
+
+## Step 3.1 — Dynamic Qibla Compass (Device Heading) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Made the Qibla compass rotate dynamically based on real device heading. On real devices, the compass dial rotates so N faces true north and the needle points toward Qibla. On simulators, falls back to static UI with "Compass not available" notice.
+
+### Sensor Integration
+- **Flutter**: `flutter_compass` 0.8.1 — `FlutterCompass.events` stream
+- **Expo**: `expo-sensors` — `Magnetometer` with `atan2(y, x)` heading calculation
+- Low-pass filter (alpha=0.2) with circular interpolation for smooth rotation
+- Heading logged via `debugPrint`/`console.log`
+
+### Rotation Strategy
+- Compass dial (ring + ticks + N/E/S/W + needle + Kaaba marker) rotates by `-heading`
+- Pointer triangle stays fixed at top (represents "you face this way")
+- Combined effect: needle always points toward Qibla in real world
+
+### Direction Guidance
+- `|angleDiff| < 5°` → "Facing Qibla ✓" (accent color)
+- `diff > 0` → "Turn right to face Qibla"
+- `diff < 0` → "Turn left to face Qibla"
+- No heading → fallback static text "Qibla is at X° from North."
+
+### Files Changed
+
+| Flutter | Change |
+|---------|--------|
+| `pubspec.yaml` | Added `flutter_compass: ^0.8.1` |
+| `qibla_screen.dart` | StatefulWidget with heading stream, Transform.rotate, unavailable state |
+
+| Expo | Change |
+|------|--------|
+| `package.json` | Added `expo-sensors` |
+| `QiblaScreen.js` | Magnetometer hook, CSS transform rotate, unavailable state |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### Limitations
+- Simulators don't have magnetometer → shows "Compass not available" (expected)
+- Raw magnetometer heading may differ slightly from iOS/Android system compass
+- Low-pass filter smoothing may lag 100-200ms behind fast rotations
+
+---
+
+## Step 3.1a — Fix Expo Compass Direction + Smoothing ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### Root Causes
+1. **Wrong direction**: `atan2(y, x)` gave opposite heading — needed `atan2(-y, x)` to match iOS compass convention
+2. **Jittery motion**: Basic smoothing without proper shortest-angle helpers caused jumpy interpolation near 0/360
+3. **Long spins at 360/0**: `Animated.Value` used absolute degrees — crossing north boundary caused 350°→10° long spin
+
+### Fixes Applied
+- **Heading**: `atan2(-y, x)` then `normalizeAngle(90 - angle)` — now matches Flutter
+- **Helpers**: Added `normalizeAngle()` and `shortestDiff()` for circular math
+- **Smoothing**: `shortestDiff(smoothed, raw) * alpha` — proper circular low-pass
+- **Animation**: Cumulative rotation tracking via `shortestDiff` deltas — no boundary jumps
+- **Rate**: 50ms Magnetometer interval (was 100ms)
+- **Logging**: Diagnostic `heading/qibla/delta` for first 20 samples + every 50th
+
+### Build
+- `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 3.1b — Fix Expo Heading Source (Accuracy) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### Root Cause
+Raw `Magnetometer` data (`atan2(-y, x)`) is **not tilt-compensated**. Tilting the phone even slightly skews the heading, causing the compass to point in the wrong Qibla direction. Flutter's `flutter_compass` uses the OS-level tilt-compensated heading, so it was accurate.
+
+### Fix
+- Replaced `expo-sensors` Magnetometer with `expo-location` `Location.watchHeadingAsync()`
+- Uses `trueHeading` (declination-corrected) with fallback to `magHeading`
+- This matches iOS's `CLHeading` — same quality as Flutter's `flutter_compass`
+- Bumped smoothing alpha to 0.25, animation duration to 80ms
+- Added temporary debug overlay showing `heading | qibla | delta`
+- Added `ARROW_BASELINE_DEG = 0` constant for clarity
+
+### Files Changed
+| File | Change |
+|------|--------|
+| Expo `QiblaScreen.js` | Replaced Magnetometer with watchHeadingAsync |
+
+### Build
+- `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
