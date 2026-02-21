@@ -135,6 +135,60 @@ class QiblaLayout {
 }
 
 // ───────────────────────────────────────────────
+// AZKAR LAYOUT  (pixel-perfect checklist tokens)
+// ───────────────────────────────────────────────
+class AzkarLayout {
+  AzkarLayout._();
+
+  static const double screenPadding = 20;
+  static const double titleMarginTop = 12;
+  static const double subtitleSize = 13;
+  static const double topHeaderGap = 12;
+
+  // Search bar
+  static const double searchHeight = 44;
+  static const double searchRadius = 14;
+  static const double searchIconSize = 20;
+  static const double searchFontSize = 14;
+
+  // Grid
+  static const double gridSpacing = 12;
+  static const double gridCardRadius = 18;
+  static const double gridCardPadding = 14;
+  static const double gridIconSize = 28;
+  static const double gridTitleSize = 14;
+  static const double gridSubtitleSize = 11;
+  static const double gridArrowSize = 16;
+
+  // Detail screen — card
+  static const double detailCardRadius = 22;
+  static const double detailCardBorderWidth = 1;
+  static const double detailCardBorderOpacity = 0.7;
+  static const double detailCardPadding = 16;
+  static const double detailArabicSize = 22;
+  static const double detailTranslationSize = 13;
+
+  // Detail screen — pager
+  static const double cardsPagerHeightFactor = 0.62;
+
+  // Detail screen — counter footer
+  static const double detailCounterSize = 18;
+  static const double detailCounterBtnSize = 44;
+  static const double footerHeight = 72;
+  static const double footerBottomInset = 14; // added to safeAreaBottom
+
+  // Detail screen — list
+  static const double listCardMinHeight = 140;
+  static const double listCardPadding = 16;
+  static const double listCardSpacing = 12;
+
+  // Segmented control
+  static const double segmentHeight = 40;
+  static const double segmentRadius = 12;
+  static const double segmentFontSize = 13;
+}
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 class PrayerIcons {

@@ -9,6 +9,7 @@ import 'src/components/bottom_nav_bar.dart';
 import 'src/screens/salah_screen.dart';
 import 'src/screens/qibla_screen.dart';
 import 'src/screens/settings_screen.dart';
+import 'src/screens/azkar_screen.dart';
 
 /// Global providers — created once, persist across the app.
 final ThemeProvider _themeProvider = ThemeProvider();
@@ -112,6 +113,8 @@ class _AppShellState extends State<AppShell> {
         );
       case 1:
         return QiblaScreen(locationNotifier: locationNotifier);
+      case 3:
+        return const AzkarScreen();
       default:
         return Center(
           child: Text('Coming soon', style: AppTypography.body(tc)),
@@ -119,3 +122,4 @@ class _AppShellState extends State<AppShell> {
     }
   }
 }
+

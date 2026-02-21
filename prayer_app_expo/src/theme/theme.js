@@ -125,6 +125,58 @@ export const QiblaLayout = {
 };
 
 // ───────────────────────────────────────────────
+// AZKAR LAYOUT  (pixel-perfect checklist tokens)
+// ───────────────────────────────────────────────
+export const AzkarLayout = {
+    screenPadding: 20,
+    titleMarginTop: 12,
+    subtitleSize: 13,
+    topHeaderGap: 12,
+
+    // Search bar
+    searchHeight: 44,
+    searchRadius: 14,
+    searchIconSize: 20,
+    searchFontSize: 14,
+
+    // Grid
+    gridSpacing: 12,
+    gridCardRadius: 18,
+    gridCardPadding: 14,
+    gridIconSize: 28,
+    gridTitleSize: 14,
+    gridSubtitleSize: 11,
+    gridArrowSize: 16,
+
+    // Detail screen — card
+    detailCardRadius: 22,
+    detailCardBorderWidth: 1,
+    detailCardBorderOpacity: 0.7,
+    detailCardPadding: 16,
+    detailArabicSize: 22,
+    detailTranslationSize: 13,
+
+    // Detail screen — pager
+    cardsPagerHeightFactor: 0.62,
+
+    // Detail screen — counter footer
+    detailCounterSize: 18,
+    detailCounterBtnSize: 44,
+    footerHeight: 72,
+    footerBottomInset: 14,
+
+    // Detail screen — list
+    listCardMinHeight: 140,
+    listCardPadding: 16,
+    listCardSpacing: 12,
+
+    // Segmented control
+    segmentHeight: 40,
+    segmentRadius: 12,
+    segmentFontSize: 13,
+};
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 export const PrayerIcons = {

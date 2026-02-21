@@ -18,6 +18,7 @@ import ScreenContainer from './src/components/ScreenContainer';
 import BottomNavBar from './src/components/BottomNavBar';
 import SalahScreen from './src/screens/SalahScreen';
 import QiblaScreen from './src/screens/QiblaScreen';
+import AzkarScreen from './src/screens/AzkarScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 // ── Disable font scaling globally for benchmark fairness ──
@@ -61,6 +62,7 @@ function AppContent() {
     const typo = getTypography(tc);
     const [activeTab, setActiveTab] = useState(0);
     const [showSettings, setShowSettings] = useState(false);
+    const [hideNav, setHideNav] = useState(false);
 
     const renderScreen = () => {
         if (showSettings) {
@@ -71,6 +73,8 @@ function AppContent() {
                 return <SalahScreen onSettingsTap={() => setShowSettings(true)} />;
             case 1:
                 return <QiblaScreen />;
+            case 3:
+                return <AzkarScreen onHideNav={setHideNav} />;
             default:
                 return (
                     <View style={styles.placeholder}>
@@ -85,13 +89,15 @@ function AppContent() {
             <StatusBar style={tc.brightness === 'dark' ? 'light' : 'dark'} />
             <ScreenContainer>
                 <View style={styles.content}>{renderScreen()}</View>
-                <BottomNavBar
-                    activeIndex={activeTab}
-                    onTap={(i) => {
-                        setActiveTab(i);
-                        setShowSettings(false);
-                    }}
-                />
+                {!hideNav && (
+                    <BottomNavBar
+                        activeIndex={activeTab}
+                        onTap={(i) => {
+                            setActiveTab(i);
+                            setShowSettings(false);
+                        }}
+                    />
+                )}
             </ScreenContainer>
         </>
     );

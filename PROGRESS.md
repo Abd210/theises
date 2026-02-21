@@ -791,3 +791,82 @@ Expo compass had visible lag compared to Flutter. Root cause: `setHeading(smooth
 
 ---
 
+
+---
+
+## Step 4 — Azkar (Grid + Detail Reader) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Implemented the full Azkar feature in both Flutter and Expo apps:
+- **Data layer**: 6 categories (Morning, Evening, After Salah, Sleep, Waking Up, General) with dhikr text from azkar.md
+- **Theme tokens**: AzkarLayout class with tokens for grid, detail, search, segmented control
+- **Grid home**: 2-column glass card grid with icon, title, subtitle, search bar
+- **Detail reader**: Swipeable cards (PageView / FlatList paging), segmented Cards/List toggle, per-item counter with increment/reset
+- **Persistence**: SharedPreferences / AsyncStorage for counter values and last index
+- **Navigation**: Tab index 3 wired; push navigation from grid → detail
+
+### Build
+- flutter analyze → **0 errors** ✅
+- npx expo export --platform ios → **Bundle OK** ✅
+
+### Step 4b — Expo Azkar Bug Fixes
+**Date**: 2026-02-21
+
+- **FlatList crash**: `onViewableItemsChanged` wrapped in `useRef` for stable reference
+- **Theme property**: `tc.accentGold` → `tc.accent` (Expo theme uses `accent` not `accentGold`)
+- **Stale closure**: Added `currentIndexRef` for accurate persistence inside callbacks
+- **UI parity**: All spacing, icons, card styles now match Flutter exactly using `AzkarLayout` tokens
+- `npx expo export --platform ios` → **Bundle OK** ✅
+
+### Step 4c — Azkar Parity Rescue
+**Date**: 2026-02-21
+
+- **FlatList crash (FINAL)**: Split into `AzkarCardsPager` + `AzkarListView` — two separate components with separate FlatList instances that never share or change props
+- **Card centering**: `CARD_WIDTH = SCREEN_W` with `pagingEnabled` — perfect 1-card-per-page snap
+- **Navbar hidden**: Added `onHideNav` callback in App.js, navbar removed when detail screen is open
+- **Data parity**: Expo `azkarData.js` rewritten with all 73 items — verified match across all 6 categories
+- Both builds pass: `npx expo export` ✅, `flutter analyze` ✅
+
+### Step 4d — Azkar Layout Parity
+**Date**: 2026-02-21
+
+- **Tokens**: Added 12 new AzkarLayout tokens with identical values in both apps
+- **Cards centering**: Full SCREEN_W paging + internal padding, fixed footerHeight: 72
+- **List spacing**: listCardSpacing: 12, listCardPadding: 16
+- **Flutter strip fix**: Removed ScreenContainer (double SafeArea), gradient applied directly
+- **API cleanup**: withOpacity() → withValues() in all Azkar screens
+- Both builds: `flutter analyze` ✅, `npx expo export` ✅
+
+### Step 4.3 — Azkar Save & Restore Progress
+**Date**: 2026-02-21
+
+Already implemented during initial detail screen build:
+- Flutter: SharedPreferences, key `azkar_{categoryId}`, JSON `{counters, lastIndex}`
+- Expo: AsyncStorage, same key pattern and structure
+- Persists on every increment, reset, and page change
+- Restores counters + page index on reopen
+- Completed derived from `counter >= repeatCount`
+
+**Manual test steps**:
+1. Open Morning → press + twice → exit app → reopen → counter shows 2/1 ✅
+2. Swipe to item 3 → exit → reopen → returns to item 3 ✅
+
+Both apps ✅
+
+## Step 5 — Quran (API-based)
+**Date**: 2026-02-21
+
+- Same API: AlQuran.cloud (uthmani/en.sahih editions)
+- Same Storage: SharedPreferences (Flutter) / AsyncStorage (Expo)
+- Same Home Sections: Continue Reading, Recents, Juz Grid
+- Same Reader Specs: Translation toggle, Font scaling, Bookmarks
+- Parity: Verified via QuranLayout tokens
+
+**Test Scenarios**:
+1. Search "baq" on home -> navigate to Al-Baqara ✅
+2. Toggle translation in reader -> English text appears ✅
+3. Scroll deeply, exit, reopen -> "Continue" card shows last surah/ayah ✅
+4. Airplane mode -> "Offline (cached)" banner shows, previously read surahs load ✅
+
+Flutter ✅ Expo ✅
