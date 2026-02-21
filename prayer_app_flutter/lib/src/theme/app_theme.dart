@@ -189,6 +189,34 @@ class AzkarLayout {
 }
 
 // ───────────────────────────────────────────────
+// QURAN LAYOUT  (Step 5 parity tokens)
+// ───────────────────────────────────────────────
+class QuranLayout {
+  QuranLayout._();
+
+  static const double screenPadding = 20;
+  static const double titleMarginTop = 12;
+  static const double subtitleSize = 13;
+  static const double sectionTitleSize = 16;
+  static const double sectionGap = 12;
+  static const double cardRadius = 22;
+  static const double cardPadding = 14;
+  static const double rowHeight = 56;
+  static const double searchHeight = 44;
+  static const double pillRadius = 14;
+  static const double searchRadius = pillRadius;
+  static const double surahRowHeight = rowHeight;
+  static const double ayahArabicSize = 28;
+  static const double ayahTranslationSize = 14;
+  static const double ayahItemPadding = 16;
+  static const double ayahItemGap = 10;
+  static const double juzButtonSize = 40;
+  static const double juzChipWidth = 78;
+  static const double juzChipGap = 8;
+  static const double topActionIconSize = 20;
+}
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 class PrayerIcons {

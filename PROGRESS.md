@@ -854,19 +854,158 @@ Already implemented during initial detail screen build:
 
 Both apps ✅
 
-## Step 5 — Quran (API-based)
-**Date**: 2026-02-21
+## Step 5 — Quran (API-based, advanced, parity-first) ✅
+**Date**: 2026-02-21 | **Status**: Complete
 
-- Same API: AlQuran.cloud (uthmani/en.sahih editions)
-- Same Storage: SharedPreferences (Flutter) / AsyncStorage (Expo)
-- Same Home Sections: Continue Reading, Recents, Juz Grid
-- Same Reader Specs: Translation toggle, Font scaling, Bookmarks
-- Parity: Verified via QuranLayout tokens
+### Endpoints used (both apps)
+- `GET /v1/surah`
+- `GET /v1/surah/{surahNumber}/quran-uthmani`
+- `GET /v1/surah/{surahNumber}/en.sahih`
 
-**Test Scenarios**:
-1. Search "baq" on home -> navigate to Al-Baqara ✅
-2. Toggle translation in reader -> English text appears ✅
-3. Scroll deeply, exit, reopen -> "Continue" card shows last surah/ayah ✅
-4. Airplane mode -> "Offline (cached)" banner shows, previously read surahs load ✅
+### Edition IDs locked (both apps)
+- Arabic: `quran-uthmani`
+- English: `en.sahih`
 
-Flutter ✅ Expo ✅
+### Cache keys (identical behavior)
+- Surah list: `quran_surah_list_v1`
+- Arabic surah: `quran_surah_{n}_quran-uthmani_v1`
+- English surah: `quran_surah_{n}_en.sahih_v1`
+
+### Persistent keys (identical JSON shape)
+- `quran_last_read` = `{surahNumber, ayahNumber}`
+- `quran_recents` = `[{surahNumber, ayahNumber}, ...]` (dedupe + max 10)
+- `quran_bookmarks` = `[{surahNumber, ayahNumber}, ...]`
+
+### Implemented in both apps
+- Quran Home tab:
+  - Title/subtitle
+  - Search bar (opens Surah List with focus)
+  - Bookmark action opens Bookmarks route
+  - Continue Reading card (from `quran_last_read`)
+  - Recents section (up to 3 shown)
+  - Juz buttons 1–30 (UI only this step)
+- Surah List:
+  - Loads 114 surahs from `/surah` with cache-first behavior
+  - Search by number, English name, Arabic name
+  - Row shows number badge, names, ayah count, revelation type, chevron
+  - Subtle highlight for current last-read surah
+- Reader:
+  - Arabic ayahs loaded from `/surah/{n}/quran-uthmani`
+  - Optional English toggle from `/surah/{n}/en.sahih`
+  - Ayah merge by `numberInSurah`
+  - Top actions: back, font size -, font size +, translation toggle, bookmark
+  - Jump-to-ayah on open (best effort; delayed scroll after list render)
+  - Last read updated on ayah tap and on scroll-stop estimation
+- Bookmarks route:
+  - Persisted list + tap to open reader at bookmarked ayah
+
+### Offline/cache behavior (both apps)
+- If cache exists: show cached immediately, then refresh from network in background
+- If network fails and cache exists: keep content + show `Offline (cached)` banner
+- If no cache and network fails: show error state
+
+### How to test offline cache
+1. Open Surah List online once (fills `quran_surah_list_v1`).
+2. Open at least one surah in Reader online (fills Arabic/EN cache keys for that surah).
+3. Enable airplane mode.
+4. Reopen Surah List and Reader:
+   - Content should load from cache.
+   - `Offline (cached)` banner should appear.
+
+### Build verification
+- Expo: `npx expo export --platform ios` ✅
+- Flutter: `flutter analyze` runs; only pre-existing non-Step5 warnings remain in `azkar_detail_screen.dart` (unused import + lint info), no Step5 errors.
+
+### Parity check
+- Flutter ✅
+- Expo ✅
+
+## Step 5.1 — Quran Core Polish (UI + UX parity) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was added (both apps)
+- Updated `QuranLayout` tokens to requested core values:
+  - `screenPadding=20`, `sectionTitleSize=16`, `sectionGap=12`, `cardRadius=22`, `cardPadding=14`, `rowHeight=56`, `searchHeight=44`, `pillRadius=14`
+- Quran Home redesign:
+  - cleaner section hierarchy
+  - premium search bar treatment
+  - improved Continue card + empty-state hint card
+  - compact Recents rows (up to 3)
+  - redesigned Juz selector as horizontal 2-row chip rail with selected style
+- Bookmarks screen improvements:
+  - Arabic preview snippet (~30 chars) under each bookmark row
+  - long-press delete action
+- Reader improvements:
+  - brief highlight flash on target ayah when opened from Continue/Recents/Bookmarks
+  - existing jump-to-ayah behavior kept
+
+### API / cache / persistence (unchanged and still parity-locked)
+- API base: `https://api.alquran.cloud/v1`
+- Endpoints:
+  - `/surah`
+  - `/surah/{n}/quran-uthmani`
+  - `/surah/{n}/en.sahih`
+- Editions:
+  - Arabic: `quran-uthmani`
+  - English: `en.sahih`
+- Cache keys:
+  - `quran_surah_list_v1`
+  - `quran_surah_{n}_quran-uthmani_v1`
+  - `quran_surah_{n}_en.sahih_v1`
+- Persistence keys:
+  - `quran_last_read`
+  - `quran_recents`
+  - `quran_bookmarks`
+
+### Offline cache test flow
+1. Open Surah List online once.
+2. Open any Reader surah online once (Arabic and translation if needed).
+3. Enable airplane mode.
+4. Reopen list/reader.
+5. Verify cached content renders with `Offline (cached)` banner.
+
+### Verification
+- Flutter: `flutter analyze` (Step 5 code clean; only pre-existing Azkar warnings remain)
+- Expo: `npx expo export --platform ios` ✅
+
+### Parity check
+- Flutter ✅
+- Expo ✅
+
+### Screenshot note
+- Side-by-side runtime screenshots were not captured in this terminal-only environment.
+
+## Step 5.2 — Juz Browsing + Search Bar Visual Match ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was added (both apps)
+- Implemented real Juz browsing start-point behavior from Quran Home chips:
+  - Tap Juz chip -> resolve first ayah in that Juz using AlQuran `/juz/{j}` -> open Reader at that surah/ayah.
+- Added Juz cache keys:
+  - `quran_juz_{j}_quran-uthmani_v1`
+  - `quran_juz_{j}_en.sahih_v1`
+- Added Juz API methods (Arabic + English) in both services.
+- Updated chip UX:
+  - selected state retained
+  - loading spinner shown while opening Juz
+- Search bar visual parity fix:
+  - removed mismatched gradient treatment
+  - both Home search bars now use the same glass style (`tc.card` + `tc.cardBorder` + same radius/height)
+
+### API additions used
+- `GET /v1/juz/{juzNumber}/quran-uthmani`
+- `GET /v1/juz/{juzNumber}/en.sahih`
+
+### Behavior
+- Juz open is cache-first for Arabic Juz data:
+  - use cached Juz data if available
+  - otherwise fetch from network and cache
+- If surah metadata is missing at open time, app refreshes surah list and retries mapping before opening reader.
+
+### Build verification
+- Flutter: `flutter analyze` (Step 5 changes clean; same pre-existing Azkar warnings remain)
+- Expo: `npx expo export --platform ios` ✅
+
+### Parity check
+- Flutter ✅
+- Expo ✅

@@ -177,6 +177,32 @@ export const AzkarLayout = {
 };
 
 // ───────────────────────────────────────────────
+// QURAN LAYOUT  (Step 5 parity tokens)
+// ───────────────────────────────────────────────
+export const QuranLayout = {
+    screenPadding: 20,
+    titleMarginTop: 12,
+    subtitleSize: 13,
+    sectionTitleSize: 16,
+    sectionGap: 12,
+    cardRadius: 22,
+    cardPadding: 14,
+    rowHeight: 56,
+    searchHeight: 44,
+    pillRadius: 14,
+    searchRadius: 14,
+    surahRowHeight: 56,
+    ayahArabicSize: 28,
+    ayahTranslationSize: 14,
+    ayahItemPadding: 16,
+    ayahItemGap: 10,
+    juzButtonSize: 40,
+    juzChipWidth: 78,
+    juzChipGap: 8,
+    topActionIconSize: 20,
+};
+
+// ───────────────────────────────────────────────
 // PRAYER ICON MAPPING (unique icon per prayer)
 // ───────────────────────────────────────────────
 export const PrayerIcons = {

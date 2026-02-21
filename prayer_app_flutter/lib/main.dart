@@ -10,6 +10,7 @@ import 'src/screens/salah_screen.dart';
 import 'src/screens/qibla_screen.dart';
 import 'src/screens/settings_screen.dart';
 import 'src/screens/azkar_screen.dart';
+import 'src/screens/quran_screen.dart';
 
 /// Global providers — created once, persist across the app.
 final ThemeProvider _themeProvider = ThemeProvider();
@@ -113,6 +114,8 @@ class _AppShellState extends State<AppShell> {
         );
       case 1:
         return QiblaScreen(locationNotifier: locationNotifier);
+      case 2:
+        return const QuranScreen();
       case 3:
         return const AzkarScreen();
       default:
@@ -122,4 +125,3 @@ class _AppShellState extends State<AppShell> {
     }
   }
 }
-

@@ -20,6 +20,7 @@ import SalahScreen from './src/screens/SalahScreen';
 import QiblaScreen from './src/screens/QiblaScreen';
 import AzkarScreen from './src/screens/AzkarScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import QuranScreen from './src/screens/QuranScreen';
 
 // ── Disable font scaling globally for benchmark fairness ──
 if (Text.defaultProps == null) Text.defaultProps = {};
@@ -73,6 +74,8 @@ function AppContent() {
                 return <SalahScreen onSettingsTap={() => setShowSettings(true)} />;
             case 1:
                 return <QiblaScreen />;
+            case 2:
+                return <QuranScreen onHideNav={setHideNav} />;
             case 3:
                 return <AzkarScreen onHideNav={setHideNav} />;
             default:
@@ -95,6 +98,7 @@ function AppContent() {
                         onTap={(i) => {
                             setActiveTab(i);
                             setShowSettings(false);
+                            setHideNav(false);
                         }}
                     />
                 )}
