@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle, Line, Polygon, Rect, Text as SvgText } from 'react-native-svg';
@@ -8,7 +8,9 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useLocation } from '../providers/LocationProvider';
 import { computeQiblaDegrees } from '../services/qiblaService';
 
-const SMOOTH_ALPHA = 0.25;
+const SMOOTH_ALPHA = 0.4;
+const ANIM_DURATION = 50;
+const TEXT_THROTTLE_MS = 200; // only re-render for text updates this often
 
 // Arrow points UP at 0° rotation — no baseline correction needed
 const ARROW_BASELINE_DEG = 0;
@@ -35,18 +37,25 @@ export default function QiblaScreen() {
     const cityLabel = loc.country ? `${loc.city}, ${loc.country}` : loc.city;
     const degrees = computeQiblaDegrees(loc.lat, loc.lon);
 
+    // heading state is only used for direction text — throttled, not per-update
     const [heading, setHeading] = useState(null);
     const [compassAvailable, setCompassAvailable] = useState(true);
+
+    // Refs for high-frequency sensor path (no re-renders)
     const smoothedRef = useRef(null);
     const animatedRotation = useRef(new Animated.Value(0)).current;
     const cumulativeRotRef = useRef(0);
     const prevSmoothedRef = useRef(null);
-    const logCountRef = useRef(0);
+    const lastTextUpdateRef = useRef(0);
+
+    // Update frequency tracking (first 5 seconds)
+    const freqStartRef = useRef(null);
+    const freqCountRef = useRef(0);
+    const freqLoggedRef = useRef(false);
 
     useEffect(() => {
         let sub;
         (async () => {
-            // expo-location heading (tilt-compensated, matches iOS compass)
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 setCompassAvailable(false);
@@ -55,13 +64,24 @@ export default function QiblaScreen() {
             }
 
             sub = await Location.watchHeadingAsync((headingData) => {
-                // Prefer trueHeading (declination-corrected), fallback magneticHeading
                 const rawHeading = (headingData.trueHeading >= 0)
                     ? headingData.trueHeading
                     : headingData.magHeading;
+                if (rawHeading < 0) return;
 
-                if (rawHeading < 0) return; // invalid
+                const now = Date.now();
 
+                // ── Update frequency tracking (first 5s) ──
+                if (freqStartRef.current === null) freqStartRef.current = now;
+                freqCountRef.current++;
+                const elapsed = now - freqStartRef.current;
+                if (elapsed >= 5000 && !freqLoggedRef.current) {
+                    const hz = (freqCountRef.current / (elapsed / 1000)).toFixed(1);
+                    console.log(`[Qibla] Update rate: ${hz} Hz (${freqCountRef.current} updates in ${(elapsed / 1000).toFixed(1)}s)`);
+                    freqLoggedRef.current = true;
+                }
+
+                // ── Smoothing (high-frequency, no setState) ──
                 if (smoothedRef.current === null) {
                     smoothedRef.current = rawHeading;
                 } else {
@@ -69,10 +89,9 @@ export default function QiblaScreen() {
                     smoothedRef.current = normalizeAngle(smoothedRef.current + diff * SMOOTH_ALPHA);
                 }
 
-                const smoothed = Math.round(smoothedRef.current * 10) / 10;
-                setHeading(smoothed);
+                const smoothed = smoothedRef.current;
 
-                // Cumulative rotation for wrap-safe Animated.Value
+                // ── Cumulative rotation → Animated.Value (no re-render) ──
                 if (prevSmoothedRef.current === null) {
                     cumulativeRotRef.current = -smoothed;
                 } else {
@@ -83,15 +102,14 @@ export default function QiblaScreen() {
 
                 Animated.timing(animatedRotation, {
                     toValue: cumulativeRotRef.current,
-                    duration: 80,
+                    duration: ANIM_DURATION,
                     useNativeDriver: true,
                 }).start();
 
-                // Diagnostic logging
-                logCountRef.current++;
-                if (logCountRef.current <= 20 || logCountRef.current % 50 === 0) {
-                    const delta = normalizeAngle(degrees - smoothed);
-                    console.log(`[Qibla] heading=${smoothed} qibla=${degrees} delta=${delta.toFixed(1)}`);
+                // ── Throttled setState for text/debug only ──
+                if (now - lastTextUpdateRef.current >= TEXT_THROTTLE_MS) {
+                    lastTextUpdateRef.current = now;
+                    setHeading(Math.round(smoothed * 10) / 10);
                 }
             });
             console.log('[Qibla] Location heading subscription started');
@@ -99,7 +117,7 @@ export default function QiblaScreen() {
         return () => { if (sub) sub.remove(); };
     }, []);
 
-    // Direction guidance
+    // Direction guidance (only re-computed on throttled heading updates)
     let statusText = '';
     let facingQibla = false;
     if (compassAvailable && heading !== null) {
@@ -246,9 +264,9 @@ export default function QiblaScreen() {
 }
 
 // ────────────────────────────────────────────────
-// COMPASS DIAL (SVG)
+// COMPASS DIAL (SVG) — memoized to avoid redraws
 // ────────────────────────────────────────────────
-function CompassDial({ degrees, tc, showPointer }) {
+const CompassDial = React.memo(function CompassDial({ degrees, tc, showPointer }) {
     const size = QiblaLayout.compassSize;
     const cx = size / 2;
     const cy = size / 2;
@@ -350,7 +368,7 @@ function CompassDial({ degrees, tc, showPointer }) {
             />
         </Svg>
     );
-}
+});
 
 // ────────────────────────────────────────────────
 // STYLES

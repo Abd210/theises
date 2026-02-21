@@ -123,3 +123,20 @@ Raw Magnetometer (`atan2(-y, x)`) is **not tilt-compensated**. Even slight phone
 
 ### Now matches Flutter
 Both apps now use OS-level tilt-compensated heading. The Qibla direction should be accurate.
+
+---
+
+## Step 3.1c — Smoothness Optimization
+
+### The lag problem
+`setHeading()` was called on every sensor update → React re-rendered the entire component every time → SVG CompassDial redrawn from scratch. On a 20Hz sensor, that's 20 full re-renders/sec including SVG layout.
+
+### Fix: two-tier update architecture
+1. **High-frequency path** (every sensor reading): smoothing → cumulative rotation → `Animated.timing(animatedRotation, ...)` with `useNativeDriver: true`. This runs on the native thread, never touches React.
+2. **Low-frequency path** (every 200ms): `setHeading()` → re-render for direction text + debug overlay. Text doesn't need 20Hz.
+
+### Additional changes
+- `CompassDial` wrapped in `React.memo` — won't re-render unless `degrees`, `tc`, or `showPointer` change
+- Smoothing alpha 0.25 → 0.4 (faster response)
+- Animation duration 80ms → 50ms (snappier)
+- Added Hz logging for first 5 seconds to measure actual update rate

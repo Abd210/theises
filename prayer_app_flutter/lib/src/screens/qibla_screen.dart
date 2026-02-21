@@ -239,6 +239,32 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   ),
                 ),
             ],
+            const SizedBox(height: AppSpacing.s8),
+
+            // ── Debug overlay (temporary) ──
+            if (_compassAvailable && _heading != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: QiblaLayout.screenPadding),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: tc.card,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: tc.cardBorder),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'heading=${_heading!.toStringAsFixed(1)}° | qibla=${qiblaBearing.toStringAsFixed(1)}° | delta=${((qiblaBearing - _heading! + 360) % 360).toStringAsFixed(1)}°',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: tc.textMuted,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             const SizedBox(height: AppSpacing.s24),
 
             // ── Status text ──

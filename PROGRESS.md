@@ -765,3 +765,29 @@ Raw `Magnetometer` data (`atan2(-y, x)`) is **not tilt-compensated**. Tilting th
 - `npx expo export --platform ios` → **Bundle OK** ✅
 
 ---
+
+## Step 3.1c — Expo Compass Smoothness Optimization ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### Problem
+Expo compass had visible lag compared to Flutter. Root cause: `setHeading(smoothed)` called on every sensor reading → full React re-render on each update (SVG compass redrawn each time).
+
+### What Changed
+| Change | Before | After |
+|--------|--------|-------|
+| setState frequency | Every sensor update | Throttled to 200ms (text only) |
+| Rotation driver | setState → CSS transform | Animated.Value → native driver |
+| Smoothing alpha | 0.25 | 0.4 |
+| Animation duration | 80ms | 50ms |
+| CompassDial | Plain function | `React.memo` (no redraw unless props change) |
+| Update Hz logging | None | First 5s logged |
+
+### Architecture
+- **High-frequency path** (every sensor update): smoothing → cumulative rotation → `Animated.timing` (native driver, no JS bridge, no re-render)
+- **Low-frequency path** (every 200ms): `setHeading()` → re-render for direction text + debug overlay only
+
+### Build
+- `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
