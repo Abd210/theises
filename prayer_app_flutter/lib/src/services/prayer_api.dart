@@ -8,11 +8,10 @@ import 'location_service.dart';
 
 class PrayerApiService {
   static const String _baseUrl = 'https://api.aladhan.com/v1/timings';
-  static const int _method = 2; // ISNA
 
   final CacheService _cache = CacheService();
 
-  Future<PrayerTimings> fetchToday() async {
+  Future<PrayerTimings> fetchToday({required int methodId, required int school}) async {
     // Read detected/persisted location
     final locSvc = LocationService();
     final loc = await locSvc.loadSaved();
@@ -21,7 +20,7 @@ class PrayerApiService {
     final dateStr = DateFormat('dd-MM-yyyy').format(now);
 
     // Cache key includes coords so changing location forces re-fetch
-    final cacheTag = '${dateStr}_${loc.lat.toStringAsFixed(2)}_${loc.lon.toStringAsFixed(2)}';
+    final cacheTag = '${dateStr}_${loc.lat.toStringAsFixed(2)}_${loc.lon.toStringAsFixed(2)}_${methodId}_$school';
 
     // Try cache first
     final cachedDate = await _cache.getCachedDate();
@@ -34,7 +33,7 @@ class PrayerApiService {
 
     // Fetch from API — NO timezonestring; let API auto-detect from lat/lon
     final url = '$_baseUrl/$dateStr?latitude=${loc.lat}&longitude=${loc.lon}'
-        '&method=$_method';
+        '&method=$methodId&school=$school';
 
     debugPrint('[PrayerAPI] URL: $url');
 

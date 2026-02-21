@@ -9,6 +9,7 @@ class ThemeColors {
   final Color backgroundEnd;
   final Color card;
   final Color cardBorder;
+  final Color modalBg;
   final Color textPrimary;
   final Color textMuted;
   final Color accent;
@@ -24,6 +25,7 @@ class ThemeColors {
     required this.backgroundEnd,
     required this.card,
     required this.cardBorder,
+    required this.modalBg,
     required this.textPrimary,
     required this.textMuted,
     required this.accent,
@@ -45,6 +47,7 @@ const ThemeColors nightTheme = ThemeColors(
   backgroundEnd: Color(0xFF1A1A2E),
   card: Color(0x26FFFFFF),
   cardBorder: Color(0x1AFFFFFF),
+  modalBg: Color(0xFF252538),
   textPrimary: Color(0xFFFFFFFF),
   textMuted: Color(0xFF9E9E9E),
   accent: Color(0xFFD4A847),
@@ -61,6 +64,7 @@ const ThemeColors forestTheme = ThemeColors(
   backgroundEnd: Color(0xFF1A2E1A),
   card: Color(0x26FFFFFF),
   cardBorder: Color(0x1AFFFFFF),
+  modalBg: Color(0xFF253825),
   textPrimary: Color(0xFFFFFFFF),
   textMuted: Color(0xFF8FA88F),
   accent: Color(0xFF4CAF50),
@@ -77,6 +81,7 @@ const ThemeColors sandTheme = ThemeColors(
   backgroundEnd: Color(0xFFEDE4D3),
   card: Color(0x14000000),
   cardBorder: Color(0x0F000000),
+  modalBg: Color(0xFFE4DBCA),
   textPrimary: Color(0xFF1A1A1A),
   textMuted: Color(0xFF7A7060),
   accent: Color(0xFFC49A3C),
@@ -93,6 +98,7 @@ const ThemeColors midnightBlueTheme = ThemeColors(
   backgroundEnd: Color(0xFF141E3C),
   card: Color(0x26FFFFFF),
   cardBorder: Color(0x1AFFFFFF),
+  modalBg: Color(0xFF202A48),
   textPrimary: Color(0xFFFFFFFF),
   textMuted: Color(0xFF8E9EC0),
   accent: Color(0xFF64B5F6),

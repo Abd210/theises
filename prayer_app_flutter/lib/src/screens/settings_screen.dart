@@ -29,6 +29,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _detectLocation() async {
     setState(() => _detecting = true);
     await widget.locationNotifier.detect();
+    // Auto-select method based on new country
+    final ps = widget.prayerSettingsNotifier;
+    if (ps.methodMode == 'auto') {
+      final country = widget.locationNotifier.data.country;
+      final bestMethod = PrayerSettingsService.autoMethodForCountry(country);
+      await ps.setMethodIdAuto(bestMethod);
+    }
     if (mounted) setState(() => _detecting = false);
   }
 
@@ -327,6 +334,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
           },
         ),
+        const SizedBox(height: AppSpacing.s12),
+
+        // ── Auto-select toggle ──
+        ListenableBuilder(
+          listenable: widget.prayerSettingsNotifier,
+          builder: (context, _) {
+            final ps = widget.prayerSettingsNotifier;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s4),
+                decoration: BoxDecoration(
+                  color: tc.card,
+                  borderRadius: BorderRadius.circular(AppSpacing.s16),
+                  border: Border.all(color: tc.cardBorder, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(MdiIcons.mapMarkerRadius, color: tc.textMuted, size: 18),
+                    const SizedBox(width: AppSpacing.s8),
+                    Expanded(
+                      child: Text(
+                        'Auto-select method',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: tc.textPrimary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 36,
+                      child: Switch.adaptive(
+                        value: ps.methodMode == 'auto',
+                        activeTrackColor: tc.accent,
+                        onChanged: (on) async {
+                          if (on) {
+                            await ps.setMethodMode('auto');
+                            // Immediately auto-select for current country
+                            final country = widget.locationNotifier.data.country;
+                            final bestMethod = PrayerSettingsService.autoMethodForCountry(country);
+                            await ps.setMethodIdAuto(bestMethod);
+                          } else {
+                            await ps.setMethodMode('manual');
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: AppSpacing.s32),
 
         // ── Time Adjustments section ──
@@ -552,78 +613,77 @@ class _OptionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    // Blend card tint with background for a solid "dark glass" look
-    final solidBg = Color.alphaBlend(tc.card, tc.backgroundEnd).withValues(alpha: 0.96);
-    
-    return Container(
-      height: screenHeight * 0.45,
-      decoration: BoxDecoration(
-        color: solidBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: tc.textMuted.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  title,
-                  style: AppTypography.titleMedium(tc).copyWith(fontSize: 17),
+    return FractionallySizedBox(
+      heightFactor: 0.45,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: tc.modalBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Grabber
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: tc.textMuted.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: options.map((opt) {
-                final isSelected = opt.id == selectedId;
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onSelect(opt.id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                    margin: const EdgeInsets.only(bottom: 4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? tc.accent.withValues(alpha: 0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            opt.label,
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected ? tc.accent : tc.textPrimary,
+            const SizedBox(height: 16),
+            // Title
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                style: AppTypography.titleMedium(tc).copyWith(fontSize: 17),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Items
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: options.map((opt) {
+                  final isSelected = opt.id == selectedId;
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onSelect(opt.id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      margin: const EdgeInsets.only(bottom: 4),
+                      decoration: BoxDecoration(
+                        color: isSelected ? tc.accent.withValues(alpha: 0.1) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              opt.label,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                color: isSelected ? tc.accent : tc.textPrimary,
+                              ),
                             ),
                           ),
-                        ),
-                        if (isSelected)
-                          Icon(MdiIcons.checkCircle, color: tc.accent, size: 20),
-                      ],
+                          if (isSelected)
+                            Icon(MdiIcons.checkCircle, color: tc.accent, size: 20),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          ],
+        ),
       ),
     );
   }

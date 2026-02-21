@@ -146,20 +146,99 @@ Both show same options, same defaults (MWL / Shafi), same persistence, same debu
 
 ---
 
-## Step 2.4 — Offsets (Store Only) + Modal Fix
+## Step 2.4 — Offsets (Store Only) + Modal/Sheet Parity Fix
 
 ### What I did
-1.  **Time Adjustments**: Implemented the UI for per-prayer offsets. Each prayer has a row with a label and `[-] [Value/Reset] [+]` controls. Tapping the value resets it to 0. Range is clamped at -30 to +30 minutes.
-2.  **Modal Fix**: The previous modals were too transparent and had inconsistent heights. I aligned them to a shared spec: 45% screen height, 24px corner radius, solid card background (0.96 opacity), and a drag handle.
+1.  **Time Adjustments**: Per-prayer offset UI with `[-] [Value/Reset] [+]` controls, clamped -30 to +30 minutes.
+2.  **Sheet Parity Fix**: Modals were too transparent (settings content bled through).
 
-### How it went
-The state management for offsets was easy as I just extended the existing `PrayerSettingsNotifier` and `PrayerSettingsProvider`. 
+### Root cause
+- **Flutter**: `Color.alphaBlend(tc.card, tc.backgroundEnd)` produced a light tint because `tc.card` is `rgba(255,255,255,0.15)` — blending a near-white over dark then making it 96% opaque still looked light.
+- **Expo**: Appending `'F5'` hex suffix to an `rgba()` string is invalid CSS and produced undefined behavior.
 
-**Flutter**: `showModalBottomSheet` with `isScrollControlled: true` allowed for the fixed 45% height. I used `Container` with a fixed height factor and `tc.card.withValues(alpha: 0.96)` for the background.
+### Fix applied
+Added `modalBg` to both theme systems — a pre-computed **solid opaque color** per theme (Night: `#252538`, Forest: `#253825`, Sand: `#E4DBCA`, Midnight Blue: `#202A48`).
 
-**Expo**: Updated the `Modal` to have a wrapper `View` at `SCREEN_HEIGHT * 0.45`. I used a hex suffix `F5` for the 0.96 opacity fix. Added `ScrollView` inside the modal so it can handle long lists of methods if needed in the future.
+- **Flutter**: `FractionallySizedBox(heightFactor: 0.45)` + `tc.modalBg` (fully opaque). Grabber 44×5 px. `barrierColor: Colors.black.withValues(alpha: 0.35)`.
+- **Expo**: Separated backdrop (`absoluteFillObject`, `rgba(0,0,0,0.35)`) from sheet. Background: `tc.modalBg` (solid). Grabber 44×5 px. Padding 16px.
+
+### Files changed
+| File | Change |
+|------|--------|
+| `app_themes.dart` | Added `modalBg` field to `ThemeColors` + all 4 themes |
+| `settings_screen.dart` | `_OptionSheet` → `FractionallySizedBox` + `tc.modalBg` |
+| `themes.js` | Added `modalBg` to all 4 themes |
+| `SettingsScreen.js` | Solid `tc.modalBg`, separate backdrop, 44×5 grabber |
 
 ### Parity status
 Flutter ✅ | Expo ✅
 
-Both apps now have identical settings UI for offsets and matching selection modals. The "Time Adjustments" section looks tight and fits the design language perfectly in both frameworks.
+Both apps now show a fully opaque, theme-matched modal. No settings content bleeds through.
+
+---
+
+## Step 2.5 — Wire Settings Into Salah (Safe Integration)
+
+### What I did
+Wired the stored prayer settings (method, school, offsets) into the Salah API and display. Before this, the API hardcoded `method=2` (ISNA) and ignored the user's selections.
+
+### Changes
+1. **API URL**: `method={methodId}&school={school}` now sent to AlAdhan. The old `_method = 2` constant was removed in both apps.
+2. **Cache key**: Extended to `{date}_{lat}_{lon}_{methodId}_{school}` so switching method/school forces a refetch.
+3. **Offsets**: Applied post-fetch as minute adjustments to the 5 main prayer times. Sunrise and Last Third stay unadjusted.
+4. **Sanity check**: After offsets, validate `Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha`. If broken (e.g., aggressive offset pushes Asr past Maghrib), show error banner and keep previous valid data.
+5. **Re-fetch on change**: SalahScreen now listens to prayer settings changes in addition to location changes.
+
+### Difficulties
+- **No real difficulties**. The wiring was straightforward since the prayer settings service, persistence, and UI were already complete from Steps 2.3–2.4.
+- I was careful not to touch any UI layout tokens or spacing — only the data feeding.
+- The Hijri string in Expo had a literal Unicode character `هـ` that I preserved by switching to `\u0647\u0640` to avoid encoding issues.
+
+### Files changed
+| File | Change |
+|------|--------|
+| `prayer_api.dart` | `fetchToday({methodId, school})` — removed hardcoded method, added school param |
+| `prayer_times.dart` | `applyOffsets()` + `sanityCheck()` methods |
+| `salah_screen.dart` | Passes settings to API, applies offsets, listens to settings changes |
+| `main.dart` | Passes `prayerSettingsNotifier` to `SalahScreen` |
+| `prayerApi.js` | `fetchPrayerTimes({methodId, school})` — removed hardcoded METHOD |
+| `SalahScreen.js` | Uses `usePrayerSettings()`, applies offsets, listens to settings changes |
+
+### Parity status
+Flutter ✅ | Expo ✅
+
+Both apps use the same API params, same cache key format, same offset logic, same sanity check. No UI regressions.
+
+---
+
+## Step 2.3.1 — Expand to 8 Methods + Auto-Select
+
+### What I did
+Expanded the method picker from 4 to 8 options. Added `methodMode` (auto/manual) as a stored setting. When auto is ON and the user presses Detect Location, I pick the method based on country (US→Moonsighting, Turkey→Diyanet, etc). Added a Switch toggle in the Prayer Settings section.
+
+### Changes
+1. **8 methods**: MWL, ISNA, Umm al-Qura, Egyptian, Karachi, Tehran, Diyanet, Moonsighting
+2. **methodMode**: persisted via SharedPreferences / AsyncStorage, default "auto"
+3. **autoMethodForCountry()**: static helper matching country string to best method ID
+4. **Detect button**: after location detect, if auto → set method based on new country
+5. **Manual picker**: tapping a method in the sheet now sets mode to "manual"
+6. **Toggle**: "Auto-select method" with Switch/toggle. ON → auto-select runs immediately for current country. OFF → manual.
+
+### Difficulties
+- Flutter's `Switch.adaptive` has deprecated `activeColor` since 3.31. Had to switch to `activeTrackColor`.
+- In Expo, `detect()` needed to return the location so the caller can read the country immediately. Updated `LocationProvider.js` to `return loc` after detecting — minor but necessary.
+
+### Files changed
+| File | Change |
+|------|--------|
+| `prayer_settings_service.dart` | 8 methods, `methodMode`, `autoMethodForCountry()`, `setMethodIdAuto()` |
+| `settings_screen.dart` | Auto-select toggle, wired detect button |
+| `prayerSettingsService.js` | 8 methods, `methodMode`, `autoMethodForCountry()` |
+| `PrayerSettingsProvider.js` | `methodMode` state, `setMethodIdAuto`, `setMethodMode` |
+| `LocationProvider.js` | `detect()` returns loc |
+| `SettingsScreen.js` | Auto-select toggle, wired detect button |
+
+### Parity status
+Flutter ✅ | Expo ✅
+
+Both apps show identical 8-method list, identical auto-select rules, identical toggle behavior. No Salah UI changes.

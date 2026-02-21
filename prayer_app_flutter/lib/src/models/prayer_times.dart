@@ -134,4 +134,44 @@ class PrayerTimings {
     }
     return target.difference(now);
   }
+
+  /// Apply per-prayer minute offsets. Returns a NEW PrayerTimings with adjusted times.
+  /// Only main 5 prayers are offset; Sunrise and LastThird stay unchanged.
+  PrayerTimings applyOffsets(Map<String, int> offsets) {
+    String adjustTime(String time24, int minutes) {
+      if (minutes == 0) return time24;
+      final now = DateTime.now();
+      final dt = timeToDateTime(time24, now).add(Duration(minutes: minutes));
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    return PrayerTimings(
+      fajr: adjustTime(fajr, offsets['Fajr'] ?? 0),
+      sunrise: sunrise,
+      dhuhr: adjustTime(dhuhr, offsets['Dhuhr'] ?? 0),
+      asr: adjustTime(asr, offsets['Asr'] ?? 0),
+      maghrib: adjustTime(maghrib, offsets['Maghrib'] ?? 0),
+      isha: adjustTime(isha, offsets['Isha'] ?? 0),
+      lastThird: lastThird,
+      hijriDay: hijriDay,
+      hijriMonthAr: hijriMonthAr,
+      hijriYear: hijriYear,
+      gregorianFormatted: gregorianFormatted,
+    );
+  }
+
+  /// Check that adjusted times are in valid order:
+  /// Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha
+  bool sanityCheck() {
+    final order = [fajr, sunrise, dhuhr, asr, maghrib, isha];
+    int prev = -1;
+    for (final t in order) {
+      final parts = t.split(':');
+      if (parts.length < 2) return false;
+      final mins = (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0);
+      if (mins <= prev) return false;
+      prev = mins;
+    }
+    return true;
+  }
 }

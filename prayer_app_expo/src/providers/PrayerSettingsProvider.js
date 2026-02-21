@@ -5,8 +5,10 @@ import {
     setMethodId as persistMethodId,
     setSchool as persistSchool,
     setOffset as persistOffset,
+    setMethodMode as persistMethodMode,
     DEFAULT_METHOD_ID,
     DEFAULT_SCHOOL,
+    DEFAULT_METHOD_MODE,
     OFFSET_PRAYERS,
 } from '../services/prayerSettingsService';
 
@@ -16,8 +18,11 @@ for (const p of OFFSET_PRAYERS) defaultOffsets[p] = 0;
 const PrayerSettingsContext = createContext({
     methodId: DEFAULT_METHOD_ID,
     school: DEFAULT_SCHOOL,
+    methodMode: DEFAULT_METHOD_MODE,
     offsets: defaultOffsets,
     setMethodId: () => { },
+    setMethodIdAuto: () => { },
+    setMethodMode: () => { },
     setSchool: () => { },
     setOffset: () => { },
 });
@@ -29,6 +34,7 @@ export function usePrayerSettings() {
 export function PrayerSettingsProvider({ children }) {
     const [methodId, setMethodIdState] = useState(DEFAULT_METHOD_ID);
     const [school, setSchoolState] = useState(DEFAULT_SCHOOL);
+    const [methodMode, setMethodModeState] = useState(DEFAULT_METHOD_MODE);
     const [offsets, setOffsetsState] = useState({ ...defaultOffsets });
 
     useEffect(() => {
@@ -36,14 +42,33 @@ export function PrayerSettingsProvider({ children }) {
             const settings = await loadPrayerSettings();
             setMethodIdState(settings.methodId);
             setSchoolState(settings.school);
+            setMethodModeState(settings.methodMode);
             const savedOffsets = await loadOffsets();
             setOffsetsState(savedOffsets);
         })();
     }, []);
 
+    // Manual picker tap → also sets mode to "manual"
     const setMethodId = useCallback(async (id) => {
         setMethodIdState(id);
+        setMethodModeState('manual');
         await persistMethodId(id);
+        await persistMethodMode('manual');
+    }, []);
+
+    // Auto-select → does NOT change mode
+    const setMethodIdAuto = useCallback(async (id) => {
+        setMethodIdState((prev) => {
+            if (prev === id) return prev;
+            return id;
+        });
+        await persistMethodId(id);
+        console.log(`[PrayerSettings] auto-selected method ${id}`);
+    }, []);
+
+    const setMethodMode = useCallback(async (mode) => {
+        setMethodModeState(mode);
+        await persistMethodMode(mode);
     }, []);
 
     const setSchool = useCallback(async (id) => {
@@ -58,7 +83,10 @@ export function PrayerSettingsProvider({ children }) {
     }, []);
 
     return (
-        <PrayerSettingsContext.Provider value={{ methodId, school, offsets, setMethodId, setSchool, setOffset }}>
+        <PrayerSettingsContext.Provider value={{
+            methodId, school, methodMode, offsets,
+            setMethodId, setMethodIdAuto, setMethodMode, setSchool, setOffset,
+        }}>
             {children}
         </PrayerSettingsContext.Provider>
     );

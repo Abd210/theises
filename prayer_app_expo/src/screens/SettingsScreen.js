@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal, Dimensions, Switch } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Spacing, SalahLayout, interFont, getTypography } from '../theme/theme';
@@ -7,14 +7,14 @@ import { appThemeList } from '../theme/themes';
 import { useTheme } from '../providers/ThemeProvider';
 import { useLocation } from '../providers/LocationProvider';
 import { usePrayerSettings } from '../providers/PrayerSettingsProvider';
-import { METHOD_OPTIONS, SCHOOL_OPTIONS, OFFSET_PRAYERS, methodLabel, schoolLabel } from '../services/prayerSettingsService';
+import { METHOD_OPTIONS, SCHOOL_OPTIONS, OFFSET_PRAYERS, methodLabel, schoolLabel, autoMethodForCountry } from '../services/prayerSettingsService';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 export default function SettingsScreen({ onBack }) {
     const { theme: tc, setTheme } = useTheme();
     const { location, detecting, detect } = useLocation();
-    const { methodId, school, offsets, setMethodId, setSchool, setOffset } = usePrayerSettings();
+    const { methodId, school, methodMode, offsets, setMethodId, setMethodIdAuto, setMethodMode, setSchool, setOffset } = usePrayerSettings();
     const typo = getTypography(tc);
     const [pickerType, setPickerType] = useState(null); // 'method' | 'school' | null
 
@@ -95,7 +95,13 @@ export default function SettingsScreen({ onBack }) {
                         <View style={{ height: Spacing.s12 }} />
                         <TouchableOpacity
                             style={[styles.detectButton, { backgroundColor: tc.accent + '1F' }]}
-                            onPress={detect}
+                            onPress={async () => {
+                                const detectedLoc = await detect();
+                                if (methodMode === 'auto' && detectedLoc?.country) {
+                                    const best = autoMethodForCountry(detectedLoc.country);
+                                    await setMethodIdAuto(best);
+                                }
+                            }}
                             disabled={detecting}
                             activeOpacity={0.7}
                         >
@@ -139,6 +145,35 @@ export default function SettingsScreen({ onBack }) {
                         />
                     </View>
                 </View>
+                <View style={{ height: Spacing.s12 }} />
+
+                {/* Auto-select method toggle */}
+                <View style={styles.padH}>
+                    <View style={[styles.locationCard, {
+                        backgroundColor: tc.card, borderColor: tc.cardBorder,
+                        flexDirection: 'row', alignItems: 'center',
+                        paddingVertical: 4, paddingHorizontal: 16,
+                    }]}>
+                        <MaterialCommunityIcons name="map-marker-radius" size={18} color={tc.textMuted} />
+                        <View style={{ width: Spacing.s8 }} />
+                        <Text style={[{ flex: 1, fontSize: 13, color: tc.textPrimary }, { fontFamily: interFont('500') }]}>Auto-select method</Text>
+                        <Switch
+                            value={methodMode === 'auto'}
+                            trackColor={{ false: tc.inactive, true: tc.accent }}
+                            onValueChange={async (on) => {
+                                if (on) {
+                                    await setMethodMode('auto');
+                                    // Immediately auto-select for current country
+                                    const country = loc.country || '';
+                                    const best = autoMethodForCountry(country);
+                                    await setMethodIdAuto(best);
+                                } else {
+                                    await setMethodMode('manual');
+                                }
+                            }}
+                        />
+                    </View>
+                </View>
                 <View style={{ height: Spacing.s32 }} />
 
                 {/* Time Adjustments section */}
@@ -179,16 +214,17 @@ export default function SettingsScreen({ onBack }) {
                 animationType="slide"
                 onRequestClose={() => setPickerType(null)}
             >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setPickerType(null)}
-                >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity
+                        style={styles.modalBackdrop}
+                        activeOpacity={1}
+                        onPress={() => setPickerType(null)}
+                    />
                     <View style={[styles.modalSheet, {
-                        backgroundColor: (tc.modalBg || tc.card) + 'F5',
-                        height: SCREEN_HEIGHT * 0.45
+                        backgroundColor: tc.modalBg,
+                        height: SCREEN_HEIGHT * 0.45,
                     }]}>
-                        <View style={[styles.modalHandle, { backgroundColor: tc.textMuted + '4D' }]} />
+                        <View style={[styles.modalHandle, { backgroundColor: tc.textMuted + '59' }]} />
                         <View style={{ paddingHorizontal: 16 }}>
                             <Text style={[typo.titleMedium, { fontSize: 17, marginBottom: 12 }]}>
                                 {pickerTitle}
@@ -221,7 +257,7 @@ export default function SettingsScreen({ onBack }) {
                             })}
                         </ScrollView>
                     </View>
-                </TouchableOpacity>
+                </View>
             </Modal>
         </>
     );
@@ -422,17 +458,20 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
+    },
+    modalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.35)',
     },
     modalSheet: {
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        paddingTop: 12,
+        padding: 16,
     },
     modalHandle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
+        width: 44,
+        height: 5,
+        borderRadius: 2.5,
         alignSelf: 'center',
         marginBottom: 16,
     },

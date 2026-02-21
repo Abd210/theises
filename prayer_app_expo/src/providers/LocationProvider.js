@@ -45,6 +45,7 @@ export function LocationProvider({ children }) {
             setLocation(loc);
             // Invalidate prayer cache so it refetches with new coords
             await AsyncStorage.removeItem('cached_prayer_date');
+            return loc;
         } finally {
             setDetecting(false);
         }

@@ -500,3 +500,124 @@ Values are persisted and survive app restart. **Not wired into Salah API** — t
 | Controls | `[-] [Reset] [+]` | Same ✅ |
 
 ---
+
+## Full Parity Audit ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Comprehensive audit of **every source file** in both apps — 15 Flutter and 16 Expo files covering themes, components, screens, services, and providers. Compared all color tokens (11 × 4 themes), 44 layout tokens, 4 typography styles, all spacing/radius values, all persistence keys, API URLs, and behavioral logic.
+
+### Result
+**Zero parity-breaking issues found.** All tokens, layout values, API parameters, cache keys, persistence keys, and behavioral logic match exactly between Flutter and Expo.
+
+### Audit Report
+- Full report: [`analysis/parity_audit.md`](file:///Volumes/ssd/theises/analysis/parity_audit.md)
+
+---
+
+## Step 2.5 — Wire Settings Into Salah ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Wired saved prayer settings (method, school, per-prayer offsets) into the Salah API request and time display in both apps. Previously the API hardcoded `method=2` (ISNA); now it uses the user's selection.
+
+### Changes
+1. **API URL** now includes `method={methodId}&school={school}` (user-selected)
+2. **Offsets** applied post-fetch as minute adjustments to the 5 main prayer times
+3. **Cache key** extended: `{date}_{lat}_{lon}_{methodId}_{school}`
+4. **Re-fetch**: Salah screen listens to prayer settings changes (method, school, offsets)
+5. **Post-offset sanity check**: Validates adjusted time order; falls back to previous data if broken
+
+### Files Changed
+
+| Flutter | Change |
+|---------|--------|
+| `services/prayer_api.dart` | `fetchToday({methodId, school})`, dynamic URL, extended cache key |
+| `models/prayer_times.dart` | `applyOffsets()` + `sanityCheck()` methods |
+| `screens/salah_screen.dart` | Passes settings to API, applies offsets, listens to settings changes |
+| `main.dart` | Passes `prayerSettingsNotifier` to `SalahScreen` |
+
+| Expo | Change |
+|------|--------|
+| `services/prayerApi.js` | `fetchPrayerTimes({methodId, school})`, dynamic URL, extended cache key |
+| `screens/SalahScreen.js` | Uses `usePrayerSettings()`, applies offsets, listens to settings changes |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| API method param | ✅ | ✅ | ✅ |
+| API school param | ✅ | ✅ | ✅ |
+| Per-prayer offsets | ✅ | ✅ | ✅ |
+| Cache key includes settings | ✅ | ✅ | ✅ |
+| Re-fetch on settings change | ✅ | ✅ | ✅ |
+| Post-offset sanity check | ✅ | ✅ | ✅ |
+| No UI layout changes | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### How to Test
+1. **Method**: Settings → change method to "Umm al-Qura" → Salah → check console for `method=4` in URL
+2. **Madhab**: Settings → change to "Hanafi" → check console for `school=1` in URL
+3. **Offsets**: Settings → set Maghrib +10 → Salah → Maghrib time shifts +10 min, countdown adjusts
+4. **Location**: Simulate GPS change → `meta.timezone` in console changes, times update
+
+---
+
+## Step 2.3.1 — Expanded Methods + Auto-Select on Detect Location ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was done
+Expanded the calculation method picker from 4 to 8 options. Added a `methodMode` (auto/manual) setting with a toggle in the UI. When auto mode is ON and the user presses Detect Location, the method is automatically chosen based on the detected country.
+
+### 8 Methods
+
+| # | ID | Method |
+|---|-----|--------|
+| 1 | 3 | Muslim World League |
+| 2 | 2 | ISNA |
+| 3 | 4 | Umm al-Qura |
+| 4 | 5 | Egyptian General Authority |
+| 5 | 1 | Univ. of Islamic Sciences, Karachi |
+| 6 | 7 | Inst. of Geophysics, Univ. of Tehran |
+| 7 | 13 | Diyanet İşleri Başkanlığı, Turkey |
+| 8 | 15 | Moonsighting Committee |
+
+### Auto-Select Rules
+
+| Country | Method |
+|---------|--------|
+| US, Canada | Moonsighting Committee (15) |
+| Turkey | Diyanet (13) |
+| Pakistan | Karachi (1) |
+| Iran | Tehran (7) |
+| Saudi Arabia | Umm al-Qura (4) |
+| Egypt | Egyptian (5) |
+| All others | MWL (3) |
+
+### Files Changed
+
+| Flutter | Change |
+|---------|--------|
+| `prayer_settings_service.dart` | 8 methods, `methodMode`, `autoMethodForCountry()`, `setMethodIdAuto()` |
+| `settings_screen.dart` | Auto-select toggle, wired detect button |
+
+| Expo | Change |
+|------|--------|
+| `prayerSettingsService.js` | 8 methods, `methodMode`, `autoMethodForCountry()` |
+| `PrayerSettingsProvider.js` | `methodMode` state, `setMethodIdAuto`, `setMethodMode` |
+| `LocationProvider.js` | `detect()` returns location |
+| `SettingsScreen.js` | Auto-select toggle, wired detect button |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `expo export --platform ios` → **Bundle OK** ✅
+
+### How to Test
+1. Settings shows 8 methods in the picker
+2. Auto-select toggle ON → detect location → method auto-updates based on country
+3. Auto-select toggle OFF → detect location → method stays unchanged
+4. Manually pick a method → toggle switches to OFF
+
+---

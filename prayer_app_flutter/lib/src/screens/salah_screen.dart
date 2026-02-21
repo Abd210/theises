@@ -6,6 +6,7 @@ import '../providers/theme_provider.dart';
 import '../services/location_service.dart';
 import '../models/prayer_times.dart';
 import '../services/prayer_api.dart';
+import '../services/prayer_settings_service.dart';
 import '../components/app_header.dart';
 import '../components/next_prayer_card.dart';
 import '../components/prayer_row.dart';
@@ -14,11 +15,13 @@ import '../components/app_divider.dart';
 class SalahScreen extends StatefulWidget {
   final VoidCallback? onSettingsTap;
   final LocationNotifier locationNotifier;
+  final PrayerSettingsNotifier prayerSettingsNotifier;
 
   const SalahScreen({
     super.key,
     this.onSettingsTap,
     required this.locationNotifier,
+    required this.prayerSettingsNotifier,
   });
 
   @override
@@ -39,17 +42,19 @@ class _SalahScreenState extends State<SalahScreen> {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    // Re-load prayer times when location changes (auto-detect or manual)
-    widget.locationNotifier.addListener(_onLocationChanged);
+    // Re-load prayer times when location or prayer settings change
+    widget.locationNotifier.addListener(_onSettingsChanged);
+    widget.prayerSettingsNotifier.addListener(_onSettingsChanged);
   }
 
-  void _onLocationChanged() {
+  void _onSettingsChanged() {
     _load();
   }
 
   @override
   void dispose() {
-    widget.locationNotifier.removeListener(_onLocationChanged);
+    widget.locationNotifier.removeListener(_onSettingsChanged);
+    widget.prayerSettingsNotifier.removeListener(_onSettingsChanged);
     _timer?.cancel();
     super.dispose();
   }
@@ -60,10 +65,33 @@ class _SalahScreenState extends State<SalahScreen> {
       _error = null;
     });
     try {
-      final data = await _api.fetchToday();
+      final ps = widget.prayerSettingsNotifier;
+      final raw = await _api.fetchToday(
+        methodId: ps.methodId,
+        school: ps.school,
+      );
+
+      // Apply per-prayer offsets
+      final adjusted = raw.applyOffsets(ps.offsets);
+
+      // Post-offset sanity check
+      if (!adjusted.sanityCheck()) {
+        debugPrint('[SalahScreen] ⚠️ Post-offset sanity check failed');
+        debugPrint('[SalahScreen] Raw: Fajr=${raw.fajr} Dhuhr=${raw.dhuhr} Asr=${raw.asr} Maghrib=${raw.maghrib} Isha=${raw.isha}');
+        debugPrint('[SalahScreen] Adjusted: Fajr=${adjusted.fajr} Dhuhr=${adjusted.dhuhr} Asr=${adjusted.asr} Maghrib=${adjusted.maghrib} Isha=${adjusted.isha}');
+        if (mounted) {
+          setState(() {
+            // Keep previous timings if available, show error
+            _error = 'Timing data invalid after offsets. Using previous data.';
+            _loading = false;
+          });
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
-          _timings = data;
+          _timings = adjusted;
           _loading = false;
         });
       }

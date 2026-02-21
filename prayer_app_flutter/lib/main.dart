@@ -107,6 +107,7 @@ class _AppShellState extends State<AppShell> {
         return SalahScreen(
           onSettingsTap: () => setState(() => _showSettings = true),
           locationNotifier: locationNotifier,
+          prayerSettingsNotifier: prayerSettingsNotifier,
         );
       default:
         return Center(

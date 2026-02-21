@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSavedLocation } from './locationService';
 
 const BASE_URL = 'https://api.aladhan.com/v1/timings';
-const METHOD = 2; // ISNA
 const CACHE_KEY = 'cached_prayer_json';
 const CACHE_DATE_KEY = 'cached_prayer_date';
 
@@ -32,7 +31,7 @@ function sanityCheck(timings) {
     return true;
 }
 
-export async function fetchPrayerTimes() {
+export async function fetchPrayerTimes({ methodId, school }) {
     // Read detected/persisted location
     const loc = await loadSavedLocation();
     const lat = loc.lat;
@@ -42,7 +41,7 @@ export async function fetchPrayerTimes() {
     const dateStr = formatDateDD(now);
 
     // Cache key includes coords so changing location forces re-fetch
-    const cacheTag = `${dateStr}_${lat.toFixed(2)}_${lng.toFixed(2)}`;
+    const cacheTag = `${dateStr}_${lat.toFixed(2)}_${lng.toFixed(2)}_${methodId}_${school}`;
 
     // Try cache first
     try {
@@ -56,7 +55,7 @@ export async function fetchPrayerTimes() {
     }
 
     // Fetch from API — NO timezonestring; let API auto-detect from lat/lon
-    const url = `${BASE_URL}/${dateStr}?latitude=${lat}&longitude=${lng}&method=${METHOD}`;
+    const url = `${BASE_URL}/${dateStr}?latitude=${lat}&longitude=${lng}&method=${methodId}&school=${school}`;
 
     console.log('[PrayerAPI] URL:', url);
 

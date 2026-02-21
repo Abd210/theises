@@ -11,6 +11,7 @@ import PrayerRow from '../components/PrayerRow';
 import AppDivider from '../components/AppDivider';
 import { fetchPrayerTimes } from '../services/prayerApi';
 import { useLocation } from '../providers/LocationProvider';
+import { usePrayerSettings } from '../providers/PrayerSettingsProvider';
 
 // ── helpers ──
 function cleanTime(raw) {
@@ -43,6 +44,7 @@ function padTwo(n) {
 export default function SalahScreen({ onSettingsTap }) {
     const { theme: tc } = useTheme();
     const { location } = useLocation();
+    const { methodId, school, offsets } = usePrayerSettings();
     const typo = getTypography(tc);
     const [timings, setTimings] = useState(null);
     const [error, setError] = useState(null);
@@ -53,7 +55,7 @@ export default function SalahScreen({ onSettingsTap }) {
         setLoading(true);
         setError(null);
         try {
-            const json = await fetchPrayerTimes();
+            const json = await fetchPrayerTimes({ methodId, school });
             const data = json.data;
             const t = data.timings;
             const hijri = data.date?.hijri;
@@ -68,7 +70,7 @@ export default function SalahScreen({ onSettingsTap }) {
             const hijriMonthAr = hijri?.month?.ar || '';
             const hijriYear = hijri?.year || '';
             const hijriFormatted = hijriDay
-                ? `\u200E${hijriDay} ${hijriMonthAr} ${hijriYear} هـ`
+                ? `\u200E${hijriDay} ${hijriMonthAr} ${hijriYear} \u0647\u0640`
                 : '—';
 
             const mainPrayers = [
@@ -79,10 +81,46 @@ export default function SalahScreen({ onSettingsTap }) {
                 { name: 'Isha', time24: cleanTime(t.Isha) },
             ];
 
+            // Apply per-prayer offsets
+            for (const p of mainPrayers) {
+                const mins = offsets[p.name] || 0;
+                if (mins !== 0) {
+                    const now2 = new Date();
+                    const dt = timeToDate(p.time24, now2);
+                    dt.setMinutes(dt.getMinutes() + mins);
+                    p.time24 = `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+                }
+            }
+
             const supplementary = [
                 { name: 'Sunrise', time24: cleanTime(t.Sunrise) },
                 { name: 'Last Third of Night', time24: cleanTime(t.Lastthird) },
             ];
+
+            // Post-offset sanity check
+            const allOrdered = [
+                mainPrayers[0], // Fajr
+                supplementary[0], // Sunrise
+                mainPrayers[1], // Dhuhr
+                mainPrayers[2], // Asr
+                mainPrayers[3], // Maghrib
+                mainPrayers[4], // Isha
+            ];
+            let prevMins = -1;
+            let orderValid = true;
+            for (const p of allOrdered) {
+                const parts = p.time24.split(':');
+                const m = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+                if (m <= prevMins) { orderValid = false; break; }
+                prevMins = m;
+            }
+            if (!orderValid) {
+                console.warn('[SalahScreen] ⚠️ Post-offset sanity check failed');
+                console.warn('[SalahScreen] Adjusted times:', mainPrayers.map(p => `${p.name}=${p.time24}`).join(' '));
+                setError('Timing data invalid after offsets. Using previous data.');
+                setLoading(false);
+                return;
+            }
 
             setTimings({
                 mainPrayers,
@@ -95,7 +133,7 @@ export default function SalahScreen({ onSettingsTap }) {
         } finally {
             setLoading(false);
         }
-    }, [location]);
+    }, [location, methodId, school, offsets]);
 
     useEffect(() => {
         load();
