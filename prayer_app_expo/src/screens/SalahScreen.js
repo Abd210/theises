@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator,
+    View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Spacing, SalahLayout, interFont, getPrayerIcon, getTypography } from '../theme/theme';
@@ -43,19 +43,22 @@ function padTwo(n) {
 
 export default function SalahScreen({ onSettingsTap }) {
     const { theme: tc } = useTheme();
-    const { location } = useLocation();
+    const { location, usingDefaultLocationBanner } = useLocation();
     const { methodId, school, offsets } = usePrayerSettings();
     const typo = getTypography(tc);
     const [timings, setTimings] = useState(null);
     const [error, setError] = useState(null);
+    const [offlineCached, setOfflineCached] = useState(false);
     const [loading, setLoading] = useState(true);
     const [, setTick] = useState(0);
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
+        setOfflineCached(false);
         try {
-            const json = await fetchPrayerTimes({ methodId, school });
+            const result = await fetchPrayerTimes({ methodId, school });
+            const json = result.json;
             const data = json.data;
             const t = data.timings;
             const hijri = data.date?.hijri;
@@ -122,6 +125,7 @@ export default function SalahScreen({ onSettingsTap }) {
                 return;
             }
 
+            setOfflineCached(!!result.offlineCached);
             setTimings({
                 mainPrayers,
                 supplementary,
@@ -129,7 +133,7 @@ export default function SalahScreen({ onSettingsTap }) {
                 hijriFormatted,
             });
         } catch (e) {
-            setError(e.message || 'Unknown error');
+            setError('Could not load prayer times. Check internet and retry.');
         } finally {
             setLoading(false);
         }
@@ -156,7 +160,13 @@ export default function SalahScreen({ onSettingsTap }) {
     if (!timings) {
         return (
             <View style={styles.center}>
-                <Text style={typo.caption}>{error || 'Unknown error'}</Text>
+                <Text style={[typo.caption, { textAlign: 'center', paddingHorizontal: 24 }]}>
+                    {error || 'Could not load prayer times. Check internet and retry.'}
+                </Text>
+                <View style={{ height: Spacing.s16 }} />
+                <TouchableOpacity onPress={load} style={[styles.retryButton, { backgroundColor: tc.card }]}>
+                    <Text style={[typo.body, { fontSize: 14 }]}>Retry</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -203,9 +213,25 @@ export default function SalahScreen({ onSettingsTap }) {
             />
             <View style={{ height: SalahLayout.headerMarginBottom }} />
 
+            {/* Default location banner */}
+            {usingDefaultLocationBanner && (
+                <View style={[styles.infoBanner, { backgroundColor: tc.card, borderColor: tc.cardBorder }]}>
+                    <MaterialCommunityIcons name="map-marker-off-outline" size={16} color={tc.textMuted} />
+                    <Text style={[typo.caption, { marginLeft: 8 }]}>Using default location</Text>
+                </View>
+            )}
+
+            {/* Offline cached banner */}
+            {offlineCached && (
+                <View style={[styles.infoBanner, { backgroundColor: tc.card, borderColor: tc.cardBorder }]}>
+                    <MaterialCommunityIcons name="wifi-off" size={16} color={tc.textMuted} />
+                    <Text style={[typo.caption, { marginLeft: 8 }]}>Offline (cached)</Text>
+                </View>
+            )}
+
             {/* Error */}
             {error && (
-                <View style={[styles.errorBanner, { backgroundColor: tc.card }]}>
+                <View style={[styles.errorBanner, { backgroundColor: tc.card, borderColor: tc.cardBorder }]}>
                     <Text style={typo.caption}>{error}</Text>
                 </View>
             )}
@@ -295,5 +321,23 @@ const styles = StyleSheet.create({
         marginHorizontal: SalahLayout.screenPadding,
         padding: Spacing.s8,
         borderRadius: Spacing.s8,
+        borderWidth: 1,
+    },
+    infoBanner: {
+        marginHorizontal: SalahLayout.screenPadding,
+        marginBottom: Spacing.s8,
+        paddingHorizontal: Spacing.s12,
+        paddingVertical: Spacing.s8,
+        borderRadius: Spacing.s8,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    retryButton: {
+        height: 36,
+        borderRadius: 18,
+        paddingHorizontal: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

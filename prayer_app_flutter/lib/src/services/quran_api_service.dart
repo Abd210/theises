@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_models.dart';
@@ -62,13 +63,17 @@ class QuranApiService {
   }
 
   Future<List<SurahMeta>> fetchSurahList() async {
-    final response = await http.get(Uri.parse('$_base/surah'));
+    final url = '$_base/surah';
+    final response = await _get(url);
     if (response.statusCode != 200) {
       throw Exception('Failed to load surah list');
     }
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final data = body['data'] as List<dynamic>;
-    final list = data.whereType<Map<String, dynamic>>().map(SurahMeta.fromApi).toList();
+    final list = data
+        .whereType<Map<String, dynamic>>()
+        .map(SurahMeta.fromApi)
+        .toList();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -79,9 +84,8 @@ class QuranApiService {
   }
 
   Future<List<Ayah>> fetchSurahArabic(int surahNumber) async {
-    final response = await http.get(
-      Uri.parse('$_base/surah/$surahNumber/$arabicEdition'),
-    );
+    final url = '$_base/surah/$surahNumber/$arabicEdition';
+    final response = await _get(url);
     if (response.statusCode != 200) {
       throw Exception('Failed to load Arabic surah text');
     }
@@ -95,9 +99,8 @@ class QuranApiService {
   }
 
   Future<List<Ayah>> fetchSurahTranslation(int surahNumber) async {
-    final response = await http.get(
-      Uri.parse('$_base/surah/$surahNumber/$englishEdition'),
-    );
+    final url = '$_base/surah/$surahNumber/$englishEdition';
+    final response = await _get(url);
     if (response.statusCode != 200) {
       throw Exception('Failed to load English translation');
     }
@@ -111,7 +114,8 @@ class QuranApiService {
   }
 
   Future<List<JuzAyah>> fetchJuzArabic(int juzNumber) async {
-    final response = await http.get(Uri.parse('$_base/juz/$juzNumber/$arabicEdition'));
+    final url = '$_base/juz/$juzNumber/$arabicEdition';
+    final response = await _get(url);
     if (response.statusCode != 200) {
       throw Exception('Failed to load Juz Arabic text');
     }
@@ -125,7 +129,8 @@ class QuranApiService {
   }
 
   Future<List<JuzAyah>> fetchJuzTranslation(int juzNumber) async {
-    final response = await http.get(Uri.parse('$_base/juz/$juzNumber/$englishEdition'));
+    final url = '$_base/juz/$juzNumber/$englishEdition';
+    final response = await _get(url);
     if (response.statusCode != 200) {
       throw Exception('Failed to load Juz English text');
     }
@@ -142,12 +147,18 @@ class QuranApiService {
     final cached = await loadCachedJuzArabic(juzNumber);
     if (cached != null && cached.isNotEmpty) {
       final first = cached.first;
-      return QuranPointer(surahNumber: first.surahNumber, ayahNumber: first.numberInSurah);
+      return QuranPointer(
+        surahNumber: first.surahNumber,
+        ayahNumber: first.numberInSurah,
+      );
     }
     final fresh = await fetchJuzArabic(juzNumber);
     if (fresh.isEmpty) return null;
     final first = fresh.first;
-    return QuranPointer(surahNumber: first.surahNumber, ayahNumber: first.numberInSurah);
+    return QuranPointer(
+      surahNumber: first.surahNumber,
+      ayahNumber: first.numberInSurah,
+    );
   }
 
   List<Ayah> mergeArabicAndEnglish({
@@ -214,7 +225,10 @@ class QuranApiService {
     }).toList();
   }
 
-  List<JuzAyah>? _decodeJuzAyahList(String raw, {required bool includeEnglish}) {
+  List<JuzAyah>? _decodeJuzAyahList(
+    String raw, {
+    required bool includeEnglish,
+  }) {
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list.whereType<Map<String, dynamic>>().map((a) {
@@ -227,6 +241,17 @@ class QuranApiService {
       }).toList();
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<http.Response> _get(String url) async {
+    try {
+      return await http.get(Uri.parse(url));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[QuranAPI] Request failed: url=$url error=$e');
+      }
+      rethrow;
     }
   }
 }

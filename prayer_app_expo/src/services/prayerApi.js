@@ -48,7 +48,7 @@ export async function fetchPrayerTimes({ methodId, school }) {
         const cachedDate = await AsyncStorage.getItem(CACHE_DATE_KEY);
         if (cachedDate === cacheTag) {
             const cached = await AsyncStorage.getItem(CACHE_KEY);
-            if (cached) return JSON.parse(cached);
+            if (cached) return { json: JSON.parse(cached), offlineCached: false };
         }
     } catch (e) {
         // Ignore cache errors
@@ -57,16 +57,34 @@ export async function fetchPrayerTimes({ methodId, school }) {
     // Fetch from API — NO timezonestring; let API auto-detect from lat/lon
     const url = `${BASE_URL}/${dateStr}?latitude=${lat}&longitude=${lng}&method=${methodId}&school=${school}`;
 
-    console.log('[PrayerAPI] URL:', url);
+    if (__DEV__) {
+        console.log('[PrayerAPI] URL:', url);
+    }
 
-    const response = await fetch(url);
+    let response;
+    try {
+        response = await fetch(url);
+    } catch (e) {
+        if (__DEV__) {
+            console.log(`[PrayerAPI] Request failed: url=${url} error=${e?.message || e}`);
+        }
+        try {
+            const cached = await AsyncStorage.getItem(CACHE_KEY);
+            if (cached) return { json: JSON.parse(cached), offlineCached: true };
+        } catch (_) {
+            // Ignore
+        }
+        throw new Error('Could not load prayer times. Check internet and retry.');
+    }
 
     if (response.ok) {
         const json = await response.json();
         const timings = json.data?.timings;
         const metaTz = json.data?.meta?.timezone;
-        console.log(`[PrayerAPI] meta.timezone=${metaTz}`);
-        console.log(`[PrayerAPI] Fajr=${timings?.Fajr} Sunrise=${timings?.Sunrise} Dhuhr=${timings?.Dhuhr} Asr=${timings?.Asr} Maghrib=${timings?.Maghrib} Isha=${timings?.Isha}`);
+        if (__DEV__) {
+            console.log(`[PrayerAPI] meta.timezone=${metaTz}`);
+            console.log(`[PrayerAPI] Fajr=${timings?.Fajr} Sunrise=${timings?.Sunrise} Dhuhr=${timings?.Dhuhr} Asr=${timings?.Asr} Maghrib=${timings?.Maghrib} Isha=${timings?.Isha}`);
+        }
 
         // Sanity check
         if (!sanityCheck(timings)) {
@@ -82,15 +100,18 @@ export async function fetchPrayerTimes({ methodId, school }) {
         } catch (e) {
             // Ignore cache errors
         }
-        return json;
+        return { json, offlineCached: false };
     } else {
+        if (__DEV__) {
+            console.log(`[PrayerAPI] Request failed: url=${url} status=${response.status}`);
+        }
         // Fallback to cache
         try {
             const cached = await AsyncStorage.getItem(CACHE_KEY);
-            if (cached) return JSON.parse(cached);
+            if (cached) return { json: JSON.parse(cached), offlineCached: true };
         } catch (e) {
             // Ignore
         }
-        throw new Error(`Failed to load prayer times (${response.status})`);
+        throw new Error('Could not load prayer times. Check internet and retry.');
     }
 }

@@ -19,9 +19,21 @@ export const juzArabicCacheKey = (j) => `quran_juz_${j}_${ARABIC_EDITION}_v1`;
 export const juzEnglishCacheKey = (j) => `quran_juz_${j}_${ENGLISH_EDITION}_v1`;
 
 async function fetchJson(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-    return res.json();
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            if (__DEV__) {
+                console.log(`[QuranAPI] Request failed: url=${url} status=${res.status}`);
+            }
+            throw new Error(`Request failed: ${res.status}`);
+        }
+        return res.json();
+    } catch (e) {
+        if (__DEV__) {
+            console.log(`[QuranAPI] Request failed: url=${url} error=${e?.message || e}`);
+        }
+        throw e;
+    }
 }
 
 export async function loadCachedSurahList() {

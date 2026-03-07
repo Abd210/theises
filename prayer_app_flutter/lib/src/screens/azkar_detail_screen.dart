@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_themes.dart';
 import '../providers/theme_provider.dart';
@@ -26,7 +25,9 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
     super.initState();
     _counters = List.filled(widget.category.items.length, 0);
     _pageController = PageController();
-    debugPrint('[AzkarData] categoryKey=${widget.category.id}, itemCount=${widget.category.items.length}');
+    debugPrint(
+      '[AzkarData] categoryKey=${widget.category.id}, itemCount=${widget.category.items.length}',
+    );
     _loadProgress();
   }
 
@@ -61,10 +62,10 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
   Future<void> _saveProgress() async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'azkar_${widget.category.id}';
-    prefs.setString(key, jsonEncode({
-      'counters': _counters,
-      'lastIndex': _currentIndex,
-    }));
+    prefs.setString(
+      key,
+      jsonEncode({'counters': _counters, 'lastIndex': _currentIndex}),
+    );
   }
 
   void _increment(int index) {
@@ -163,10 +164,7 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
           border: Border.all(color: tc.cardBorder),
         ),
         child: Row(
-          children: [
-            _segmentTab(tc, 'Cards', 0),
-            _segmentTab(tc, 'List', 1),
-          ],
+          children: [_segmentTab(tc, 'Cards', 0), _segmentTab(tc, 'List', 1)],
         ),
       ),
     );
@@ -181,7 +179,9 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
           alignment: Alignment.center,
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isActive ? tc.accent.withValues(alpha: 0.15) : Colors.transparent,
+            color: isActive
+                ? tc.accent.withValues(alpha: 0.15)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(AzkarLayout.segmentRadius - 2),
           ),
           child: Text(
@@ -198,7 +198,11 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
     );
   }
 
-  Widget _buildCardsView(ThemeColors tc, List<AzkarItem> items, [double bottomInset = 0]) {
+  Widget _buildCardsView(
+    ThemeColors tc,
+    List<AzkarItem> items, [
+    double bottomInset = 0,
+  ]) {
     return PageView.builder(
       controller: _pageController,
       itemCount: items.length,
@@ -212,7 +216,12 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
     );
   }
 
-  Widget _buildCard(ThemeColors tc, AzkarItem item, int index, [double bottomInset = 0]) {
+  Widget _buildCard(
+    ThemeColors tc,
+    AzkarItem item,
+    int index, [
+    double bottomInset = 0,
+  ]) {
     final count = _counters[index];
     final done = count >= item.repeatCount;
 
@@ -227,7 +236,11 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
           color: tc.card,
           borderRadius: BorderRadius.circular(AzkarLayout.detailCardRadius),
           border: Border.all(
-            color: done ? tc.accent.withValues(alpha: AzkarLayout.detailCardBorderOpacity) : tc.cardBorder,
+            color: done
+                ? tc.accent.withValues(
+                    alpha: AzkarLayout.detailCardBorderOpacity,
+                  )
+                : tc.cardBorder,
             width: AzkarLayout.detailCardBorderWidth,
           ),
         ),
@@ -239,54 +252,59 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                 onTap: () => _increment(index),
                 behavior: HitTestBehavior.opaque,
                 child: SingleChildScrollView(
-                padding: EdgeInsets.all(AzkarLayout.detailCardPadding),
-                child: Column(
-                  children: [
-                    if (done)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: tc.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                          ),
-                          child: Text(
-                            'Completed ✓',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: tc.accent,
+                  padding: EdgeInsets.all(AzkarLayout.detailCardPadding),
+                  child: Column(
+                    children: [
+                      if (done)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: tc.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                            ),
+                            child: Text(
+                              'Completed ✓',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: tc.accent,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    Text(
-                      item.arabic,
-                      style: TextStyle(
-                        fontSize: AzkarLayout.detailArabicSize,
-                        color: tc.textPrimary,
-                        height: 2.0,
-                      ),
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.rtl,
-                    ),
-                    if (item.translation.isNotEmpty) ...[
-                      const SizedBox(height: 16),
                       Text(
-                        item.translation,
+                        item.arabic,
                         style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: AzkarLayout.detailTranslationSize,
-                          color: tc.textMuted,
+                          fontSize: AzkarLayout.detailArabicSize,
+                          color: tc.textPrimary,
+                          height: 2.0,
                         ),
                         textAlign: TextAlign.center,
+                        textDirection: TextDirection.rtl,
                       ),
+                      if (item.translation.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          item.translation,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: AzkarLayout.detailTranslationSize,
+                            color: tc.textMuted,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
               ),
             ),
             // Counter footer
@@ -347,7 +365,11 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
     );
   }
 
-  Widget _buildListView(ThemeColors tc, List<AzkarItem> items, [double bottomInset = 0]) {
+  Widget _buildListView(
+    ThemeColors tc,
+    List<AzkarItem> items, [
+    double bottomInset = 0,
+  ]) {
     return ListView.separated(
       padding: EdgeInsets.only(
         left: AzkarLayout.screenPadding,
@@ -355,7 +377,8 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
         bottom: bottomInset + AzkarLayout.footerBottomInset,
       ),
       itemCount: items.length,
-      separatorBuilder: (_, __) => SizedBox(height: AzkarLayout.listCardSpacing),
+      separatorBuilder: (_, separatorIndex) =>
+          SizedBox(height: AzkarLayout.listCardSpacing),
       itemBuilder: (context, index) {
         final item = items[index];
         final count = _counters[index];
@@ -368,7 +391,11 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
               color: tc.card,
               borderRadius: BorderRadius.circular(AzkarLayout.gridCardRadius),
               border: Border.all(
-                color: done ? tc.accent.withValues(alpha: AzkarLayout.detailCardBorderOpacity) : tc.cardBorder,
+                color: done
+                    ? tc.accent.withValues(
+                        alpha: AzkarLayout.detailCardBorderOpacity,
+                      )
+                    : tc.cardBorder,
               ),
             ),
             child: Column(
@@ -389,8 +416,14 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     if (item.translation.isNotEmpty)
-                      Text(item.translation,
-                          style: TextStyle(fontSize: 12, color: tc.textMuted, fontFamily: 'Inter')),
+                      Text(
+                        item.translation,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: tc.textMuted,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
                     if (item.translation.isEmpty) const Spacer(),
                     Text(
                       '$count / ${item.repeatCount}',

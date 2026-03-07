@@ -1009,3 +1009,56 @@ Both apps ✅
 ### Parity check
 - Flutter ✅
 - Expo ✅
+
+## Step 6.1 — Android Fix Pack (Network + First-Launch Location + Offline UX) ✅
+**Date**: 2026-02-21 | **Status**: Complete
+
+### What was fixed (both apps)
+- Added a first-launch location flow guarded by a persistent `firstRun` flag:
+  - Storage key: `app_first_run_location_v1`
+  - On first launch: request location permission once
+  - If granted: detect GPS location + reverse geocode + invalidate prayer cache
+  - If denied/fallback: keep Bucharest defaults and show subtle `Using default location` banner
+  - Manual `Detect location` in Settings still works and can re-trigger permission flow
+- Unified offline UX for API failures:
+  - If cached data exists: render cached content with `Offline (cached)` banner
+  - If no cache: show friendly error + `Retry` button (no raw exception dump)
+- Added debug-only failing request logs (`URL + error/status`) for prayer and Quran APIs.
+
+### Flutter-specific Android fix
+- Added missing Android internet permission:
+  - `android/app/src/main/AndroidManifest.xml`
+  - `<uses-permission android:name="android.permission.INTERNET"/>`
+
+### Quran reliability updates
+- Surah list continues cache-first with background refresh and now shows retry UI when cache is absent.
+- Juz open failures are handled gracefully:
+  - Flutter: `SnackBar`
+  - Expo: toast/alert message
+  - UI remains responsive and does not crash.
+
+### Expo Android permission config
+- Updated `app.json` with location permissions and `expo-location` plugin for Android/iOS runtime prompts.
+
+### Verification run
+- Flutter: `flutter analyze` -> **No issues found** ✅
+- Expo: `npx expo export --platform android` -> **Bundle OK** ✅
+
+### Android test checklist
+1. Fresh install on Android emulator/device.
+2. First app launch should show location permission prompt.
+3. Deny permission:
+   - App uses Bucharest defaults
+   - `Using default location` banner is visible on Salah.
+4. Turn internet OFF and open Salah/Quran:
+   - If cache exists -> content loads with `Offline (cached)` banner.
+   - If cache missing -> friendly error + `Retry` shown.
+5. Go to Settings -> `Detect location` and grant permission:
+   - Location updates to GPS city/country.
+   - Salah fetches with new coordinates.
+6. In Quran Home, tap Juz while offline:
+   - Graceful failure message shown, app does not break.
+
+### Parity check
+- Flutter ✅
+- Expo ✅

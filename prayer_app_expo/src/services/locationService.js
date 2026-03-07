@@ -8,6 +8,7 @@ const KEYS = {
     country: 'loc_country',
     timezone: 'loc_timezone',
     source: 'loc_source',
+    firstRunCompleted: 'app_first_run_location_v3',
 };
 
 export const FALLBACK_LOCATION = {
@@ -98,4 +99,20 @@ async function persistLocation(d) {
         await AsyncStorage.setItem(KEYS.timezone, d.timezone);
         await AsyncStorage.setItem(KEYS.source, d.source);
     } catch (_) { /* ignore */ }
+}
+
+export async function isFirstRunCompleted() {
+    try {
+        return (await AsyncStorage.getItem(KEYS.firstRunCompleted)) === 'true';
+    } catch (_) {
+        return false;
+    }
+}
+
+export async function markFirstRunCompleted() {
+    try {
+        await AsyncStorage.setItem(KEYS.firstRunCompleted, 'true');
+    } catch (_) {
+        // ignore
+    }
 }

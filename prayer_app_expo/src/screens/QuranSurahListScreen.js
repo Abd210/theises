@@ -56,7 +56,7 @@ export default function QuranSurahListScreen({ onBack, onOpenReader, autofocusSe
                 setOfflineCached(true);
                 setLoading(false);
             } else {
-                setError('Failed to load surah list');
+                setError('Could not load surah list. Check internet and retry.');
                 setLoading(false);
             }
         }
@@ -108,7 +108,13 @@ export default function QuranSurahListScreen({ onBack, onOpenReader, autofocusSe
             {loading && surahs.length === 0 ? (
                 <View style={styles.center}><ActivityIndicator size="large" color={tc.accent} /></View>
             ) : error && surahs.length === 0 ? (
-                <View style={styles.center}><Text style={typo.caption}>{error}</Text></View>
+                <View style={styles.center}>
+                    <Text style={[typo.caption, { textAlign: 'center', paddingHorizontal: 24 }]}>{error}</Text>
+                    <View style={{ height: 12 }} />
+                    <TouchableOpacity style={[styles.retryBtn, { borderColor: tc.cardBorder }]} onPress={loadData}>
+                        <Text style={[typo.body, { fontSize: 14 }]}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
             ) : (
                 <FlatList
                     data={filtered}
@@ -198,6 +204,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    retryBtn: {
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 14,
     },
     badge: {
         width: 32,

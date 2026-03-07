@@ -78,7 +78,7 @@ class _QuranScreenState extends State<QuranScreen> {
         });
       } else {
         setState(() {
-          _error = 'Failed to load surah metadata';
+          _error = 'Could not load surah metadata. Check internet and retry.';
           _loading = false;
         });
       }
@@ -126,9 +126,9 @@ class _QuranScreenState extends State<QuranScreen> {
       final pointer = await _api.getJuzStartPointer(juz);
       if (pointer == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unable to load Juz $juz')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Unable to load Juz $juz')));
         }
         return;
       }
@@ -162,9 +162,9 @@ class _QuranScreenState extends State<QuranScreen> {
       _loadPersisted();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open Juz $juz')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to open Juz $juz')));
       }
       debugPrint('[QuranHome] Juz open failed: $e');
     } finally {
@@ -209,7 +209,9 @@ class _QuranScreenState extends State<QuranScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '114 Surahs · Read & Reflect',
-                    style: AppTypography.caption(tc).copyWith(fontSize: QuranLayout.subtitleSize),
+                    style: AppTypography.caption(
+                      tc,
+                    ).copyWith(fontSize: QuranLayout.subtitleSize),
                   ),
                 ],
               ),
@@ -217,7 +219,11 @@ class _QuranScreenState extends State<QuranScreen> {
             GestureDetector(
               onTap: () {
                 Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const QuranBookmarksScreen()))
+                    .push(
+                      MaterialPageRoute(
+                        builder: (_) => const QuranBookmarksScreen(),
+                      ),
+                    )
                     .then((_) => _loadPersisted());
               },
               child: Container(
@@ -279,9 +285,28 @@ class _QuranScreenState extends State<QuranScreen> {
           ),
 
         if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_error!, style: AppTypography.caption(tc)),
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: tc.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: tc.cardBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_error!, style: AppTypography.caption(tc)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 34,
+                  child: OutlinedButton(
+                    onPressed: _loadSurahList,
+                    child: const Text('Retry'),
+                  ),
+                ),
+              ],
+            ),
           ),
 
         const SizedBox(height: QuranLayout.sectionGap),
@@ -311,16 +336,22 @@ class _QuranScreenState extends State<QuranScreen> {
               SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: tc.accent),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: tc.accent,
+                ),
               ),
           ],
         ),
         const SizedBox(height: 8),
-        ..._recents.take(3).map(
+        ..._recents
+            .take(3)
+            .map(
               (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _ActionCard(
-                  text: '${_findSurah(r.surahNumber)?.englishName ?? 'Surah ${r.surahNumber}'} · Ayah ${r.ayahNumber}',
+                  text:
+                      '${_findSurah(r.surahNumber)?.englishName ?? 'Surah ${r.surahNumber}'} · Ayah ${r.ayahNumber}',
                   onTap: () => _openReader(r),
                   compact: true,
                 ),
@@ -339,7 +370,8 @@ class _QuranScreenState extends State<QuranScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: 15,
-            separatorBuilder: (_, _) => const SizedBox(width: QuranLayout.juzChipGap),
+            separatorBuilder: (_, _) =>
+                const SizedBox(width: QuranLayout.juzChipGap),
             itemBuilder: (context, col) {
               final top = col + 1;
               final bottom = col + 16;

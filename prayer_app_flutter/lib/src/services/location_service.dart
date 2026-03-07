@@ -38,6 +38,7 @@ class LocationService {
   static const String _kCountry = 'loc_country';
   static const String _kTz = 'loc_timezone';
   static const String _kSource = 'loc_source';
+  static const String _kFirstRunCompleted = 'app_first_run_location_v3';
 
   /// Load persisted location, or return fallback.
   Future<LocationData> loadSaved() async {
@@ -88,10 +89,17 @@ class LocationService {
     String city = 'Unknown';
     String country = '';
     try {
-      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        city = p.locality ?? p.subAdministrativeArea ?? p.administrativeArea ?? 'Unknown';
+        city =
+            p.locality ??
+            p.subAdministrativeArea ??
+            p.administrativeArea ??
+            'Unknown';
         country = p.country ?? '';
       }
     } catch (_) {
@@ -166,6 +174,16 @@ class LocationService {
     await prefs.setString(_kTz, d.timezone);
     await prefs.setString(_kSource, d.source);
   }
+
+  Future<bool> isFirstRunCompleted() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_kFirstRunCompleted) ?? false;
+  }
+
+  Future<void> markFirstRunCompleted() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kFirstRunCompleted, true);
+  }
 }
 
 /// Reactive wrapper so UI rebuilds when location changes.
@@ -173,10 +191,25 @@ class LocationNotifier extends ChangeNotifier {
   final LocationService _svc = LocationService();
 
   LocationData _data = LocationData.fallback;
+  bool _firstRunCompleted = false;
   LocationData get data => _data;
+  bool get showDefaultLocationBanner =>
+      _firstRunCompleted && _data.source == 'default';
 
   Future<void> load() async {
     _data = await _svc.loadSaved();
+    _firstRunCompleted = await _svc.isFirstRunCompleted();
+    notifyListeners();
+  }
+
+  Future<void> ensureFirstRunSetup() async {
+    if (_firstRunCompleted) return;
+    _data = await _svc.detect();
+    _firstRunCompleted = true;
+    await _svc.markFirstRunCompleted();
+    // Invalidate prayer cache so SalahScreen refetches with the new source/coords.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('cached_prayer_date');
     notifyListeners();
   }
 

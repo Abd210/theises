@@ -6,6 +6,9 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
+    Platform,
+    ToastAndroid,
+    Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../providers/ThemeProvider';
@@ -51,6 +54,14 @@ export default function QuranScreen({ onHideNav }) {
         }
     }, [mode]);
 
+    function showMessage(message) {
+        if (Platform.OS === 'android') {
+            ToastAndroid.show(message, ToastAndroid.SHORT);
+        } else {
+            Alert.alert('Notice', message);
+        }
+    }
+
     async function loadPersisted() {
         const [lr, rc] = await Promise.all([loadLastRead(), loadRecents()]);
         setLastReadState(lr);
@@ -78,7 +89,7 @@ export default function QuranScreen({ onHideNav }) {
                 setOfflineCached(true);
                 setLoading(false);
             } else {
-                setError('Failed to load surah metadata');
+                setError('Could not load surah metadata. Check internet and retry.');
                 setLoading(false);
             }
         }
@@ -103,17 +114,26 @@ export default function QuranScreen({ onHideNav }) {
         setOpeningJuz(juz);
         try {
             const pointer = await getJuzStartPointer(juz);
-            if (!pointer) return;
+            if (!pointer) {
+                showMessage(`Unable to load Juz ${juz}`);
+                return;
+            }
             let surah = surahMap[pointer.surahNumber];
             if (!surah) {
                 const refreshed = await fetchSurahList();
                 setSurahs(refreshed);
                 surah = refreshed.find((s) => s.number === pointer.surahNumber);
             }
-            if (!surah) return;
+            if (!surah) {
+                showMessage(`Unable to open Juz ${juz}`);
+                return;
+            }
             openReader(surah, pointer.ayahNumber, 'home');
         } catch (e) {
-            console.log('[QuranHome] Juz open failed:', e?.message || e);
+            showMessage(`Failed to open Juz ${juz}`);
+            if (__DEV__) {
+                console.log('[QuranHome] Juz open failed:', e?.message || e);
+            }
         } finally {
             setOpeningJuz(null);
         }
@@ -197,7 +217,15 @@ export default function QuranScreen({ onHideNav }) {
                     <Text style={[typo.caption, { marginLeft: 8 }]}>Offline (cached)</Text>
                 </View>
             )}
-            {error ? <Text style={[typo.caption, { marginTop: 8 }]}>{error}</Text> : null}
+            {error ? (
+                <View style={[styles.errorCard, { borderColor: tc.cardBorder, backgroundColor: tc.card }]}>
+                    <Text style={typo.caption}>{error}</Text>
+                    <View style={{ height: 8 }} />
+                    <TouchableOpacity style={[styles.retryBtn, { borderColor: tc.cardBorder }]} onPress={loadSurahList}>
+                        <Text style={[typo.body, { fontSize: 14 }]}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
 
             <View style={{ height: QuranLayout.sectionGap }} />
             {sectionTitle('Continue Reading')}
@@ -341,6 +369,21 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    errorCard: {
+        marginTop: 8,
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+    },
+    retryBtn: {
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 14,
     },
     actionCard: {
         borderWidth: 1,

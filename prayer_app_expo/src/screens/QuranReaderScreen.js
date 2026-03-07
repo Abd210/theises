@@ -220,7 +220,13 @@ export default function QuranReaderScreen({ surah, initialAyahNumber = 1, onBack
             {loading && merged.length === 0 ? (
                 <View style={styles.center}><ActivityIndicator size="large" color={tc.accent} /></View>
             ) : error && merged.length === 0 ? (
-                <View style={styles.center}><Text style={typo.caption}>{error}</Text></View>
+                <View style={styles.center}>
+                    <Text style={[typo.caption, { textAlign: 'center', paddingHorizontal: 24 }]}>{error}</Text>
+                    <View style={{ height: 12 }} />
+                    <TouchableOpacity style={[styles.retryBtn, { borderColor: tc.cardBorder }]} onPress={loadArabic}>
+                        <Text style={[typo.body, { fontSize: 14 }]}>Retry</Text>
+                    </TouchableOpacity>
+                </View>
             ) : (
                 <FlatList
                     ref={listRef}
@@ -304,6 +310,14 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    retryBtn: {
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 14,
     },
     ayahItem: {
         marginBottom: QuranLayout.ayahItemGap,

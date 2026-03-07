@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadSavedLocation, detectLocation } from '../services/locationService';
+import {
+    loadSavedLocation,
+    detectLocation,
+    isFirstRunCompleted,
+    markFirstRunCompleted,
+} from '../services/locationService';
 
 const LocationContext = createContext({
     location: null,
     detecting: false,
+    usingDefaultLocationBanner: false,
     detect: () => { },
 });
 
@@ -15,25 +21,31 @@ export function useLocation() {
 export function LocationProvider({ children }) {
     const [location, setLocation] = useState(null);
     const [detecting, setDetecting] = useState(false);
+    const [firstRunCompleted, setFirstRunCompleted] = useState(false);
 
     useEffect(() => {
         (async () => {
             const saved = await loadSavedLocation();
-            // If no prior GPS fix, auto-detect on first launch
-            if (saved.source === 'default') {
+            setLocation(saved);
+
+            const isFirstRunDone = await isFirstRunCompleted();
+            setFirstRunCompleted(isFirstRunDone);
+            if (!isFirstRunDone) {
                 setDetecting(true);
                 try {
                     const loc = await detectLocation();
                     setLocation(loc);
-                    // Invalidate prayer cache so it refetches with new coords
-                    await AsyncStorage.removeItem('cached_prayer_date');
+                    if (loc.source === 'gps') {
+                        // Invalidate prayer cache so it refetches with new coords
+                        await AsyncStorage.removeItem('cached_prayer_date');
+                    }
                 } catch (_) {
                     setLocation(saved);
                 } finally {
+                    await markFirstRunCompleted();
+                    setFirstRunCompleted(true);
                     setDetecting(false);
                 }
-            } else {
-                setLocation(saved);
             }
         })();
     }, []);
@@ -52,7 +64,14 @@ export function LocationProvider({ children }) {
     }, []);
 
     return (
-        <LocationContext.Provider value={{ location, detecting, detect }}>
+        <LocationContext.Provider
+            value={{
+                location,
+                detecting,
+                detect,
+                usingDefaultLocationBanner: firstRunCompleted && location?.source === 'default',
+            }}
+        >
             {children}
         </LocationContext.Provider>
     );

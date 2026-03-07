@@ -21,12 +21,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _themeProvider.loadTheme();
   await prayerSettingsNotifier.load();
-  // Load saved location; if source is 'default', auto-detect GPS.
+  // Load saved location at startup. Run first-launch permission flow after UI mounts
+  // so Android does not stall on a black/splash screen during app bootstrap.
   await locationNotifier.load();
-  if (locationNotifier.data.source == 'default') {
-    // Fire-and-forget — runs permission prompt then updates UI.
-    locationNotifier.detect();
-  }
   runApp(const PrayerApp());
 }
 
@@ -49,9 +46,9 @@ class PrayerApp extends StatelessWidget {
               return ThemeScope(
                 notifier: _themeProvider,
                 child: MediaQuery(
-                  data: MediaQuery.of(context).copyWith(
-                    textScaler: const TextScaler.linear(1.0),
-                  ),
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: const TextScaler.linear(1.0)),
                   child: child!,
                 ),
               );
@@ -74,6 +71,14 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _activeTab = 0;
   bool _showSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      locationNotifier.ensureFirstRunSetup();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

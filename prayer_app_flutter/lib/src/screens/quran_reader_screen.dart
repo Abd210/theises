@@ -107,7 +107,7 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
         });
       } else {
         setState(() {
-          _error = 'Failed to load surah text';
+          _error = 'Could not load surah text. Check internet and retry.';
           _loading = false;
         });
       }
@@ -224,8 +224,12 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
                 fontScale: _fontScale,
                 isBookmarked: _currentBookmarked,
                 onBack: () => Navigator.of(context).pop(),
-                onFontDown: () => setState(() => _fontScale = (_fontScale - 0.1).clamp(0.8, 1.6)),
-                onFontUp: () => setState(() => _fontScale = (_fontScale + 0.1).clamp(0.8, 1.6)),
+                onFontDown: () => setState(
+                  () => _fontScale = (_fontScale - 0.1).clamp(0.8, 1.6),
+                ),
+                onFontUp: () => setState(
+                  () => _fontScale = (_fontScale + 0.1).clamp(0.8, 1.6),
+                ),
                 onToggleTranslation: () {
                   setState(() => _showTranslation = !_showTranslation);
                   if (!_showTranslation) {
@@ -238,7 +242,10 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
               if (_offlineCached)
                 Container(
                   margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: tc.card,
                     borderRadius: BorderRadius.circular(10),
@@ -259,73 +266,98 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
                 child: _loading && _merged.isEmpty
                     ? Center(child: CircularProgressIndicator(color: tc.accent))
                     : _error != null && _merged.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              child: Text(_error!, style: AppTypography.caption(tc)),
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: _scroll,
-                            itemCount: _merged.length,
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                            itemBuilder: (context, index) {
-                              final ayah = _merged[index];
-                              return GestureDetector(
-                                onTap: () => _updateLastRead(ayah.numberInSurah),
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: QuranLayout.ayahItemGap),
-                                  padding: const EdgeInsets.all(QuranLayout.ayahItemPadding),
-                                  decoration: BoxDecoration(
-                                    color: tc.card,
-                                    borderRadius: BorderRadius.circular(QuranLayout.cardRadius),
-                                    border: Border.all(
-                                      color: _flashAyah == ayah.numberInSurah
-                                          ? tc.accent.withValues(alpha: 0.9)
-                                          : ayah.numberInSurah == _currentAyah
-                                              ? tc.accent.withValues(alpha: 0.5)
-                                              : tc.cardBorder,
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.caption(tc),
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton(
+                                onPressed: _loadArabic,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scroll,
+                        itemCount: _merged.length,
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                        itemBuilder: (context, index) {
+                          final ayah = _merged[index];
+                          return GestureDetector(
+                            onTap: () => _updateLastRead(ayah.numberInSurah),
+                            child: Container(
+                              margin: const EdgeInsets.only(
+                                bottom: QuranLayout.ayahItemGap,
+                              ),
+                              padding: const EdgeInsets.all(
+                                QuranLayout.ayahItemPadding,
+                              ),
+                              decoration: BoxDecoration(
+                                color: tc.card,
+                                borderRadius: BorderRadius.circular(
+                                  QuranLayout.cardRadius,
+                                ),
+                                border: Border.all(
+                                  color: _flashAyah == ayah.numberInSurah
+                                      ? tc.accent.withValues(alpha: 0.9)
+                                      : ayah.numberInSurah == _currentAyah
+                                      ? tc.accent.withValues(alpha: 0.5)
+                                      : tc.cardBorder,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    '${ayah.numberInSurah}',
+                                    style: AppTypography.caption(tc).copyWith(
+                                      color: tc.accent,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        '${ayah.numberInSurah}',
-                                        style: AppTypography.caption(tc).copyWith(
-                                          color: tc.accent,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        ayah.textAr,
-                                        textAlign: TextAlign.right,
-                                        textDirection: TextDirection.rtl,
-                                        style: TextStyle(
-                                          fontFamily: 'serif',
-                                          fontSize: QuranLayout.ayahArabicSize * _fontScale,
-                                          height: 1.9,
-                                          color: tc.textPrimary,
-                                        ),
-                                      ),
-                                      if (_showTranslation && (ayah.textEn?.isNotEmpty ?? false)) ...[
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          ayah.textEn!,
-                                          style: AppTypography.body(tc).copyWith(
-                                            fontSize: QuranLayout.ayahTranslationSize * _fontScale,
-                                            color: tc.textMuted,
-                                            height: 1.45,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    ayah.textAr,
+                                    textAlign: TextAlign.right,
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                      fontFamily: 'serif',
+                                      fontSize:
+                                          QuranLayout.ayahArabicSize *
+                                          _fontScale,
+                                      height: 1.9,
+                                      color: tc.textPrimary,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
+                                  if (_showTranslation &&
+                                      (ayah.textEn?.isNotEmpty ?? false)) ...[
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      ayah.textEn!,
+                                      style: AppTypography.body(tc).copyWith(
+                                        fontSize:
+                                            QuranLayout.ayahTranslationSize *
+                                            _fontScale,
+                                        color: tc.textMuted,
+                                        height: 1.45,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -381,7 +413,9 @@ class _TopBar extends StatelessWidget {
                   surah.englishName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.body(tc).copyWith(fontWeight: FontWeight.w600),
+                  style: AppTypography.body(
+                    tc,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   '${surah.nameAr} · Ayah $currentAyah',
@@ -406,10 +440,15 @@ class _TopBar extends StatelessWidget {
                 ? SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: tc.accent),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: tc.accent,
+                    ),
                   )
                 : Icon(
-                    showTranslation ? MdiIcons.translate : MdiIcons.translateOff,
+                    showTranslation
+                        ? MdiIcons.translate
+                        : MdiIcons.translateOff,
                     color: showTranslation ? tc.accent : tc.textPrimary,
                   ),
           ),

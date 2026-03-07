@@ -32,6 +32,7 @@ class _SalahScreenState extends State<SalahScreen> {
   final PrayerApiService _api = PrayerApiService();
   PrayerTimings? _timings;
   String? _error;
+  bool _offlineCached = false;
   bool _loading = true;
   Timer? _timer;
 
@@ -63,13 +64,15 @@ class _SalahScreenState extends State<SalahScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _offlineCached = false;
     });
     try {
       final ps = widget.prayerSettingsNotifier;
-      final raw = await _api.fetchToday(
+      final result = await _api.fetchToday(
         methodId: ps.methodId,
         school: ps.school,
       );
+      final raw = result.timings;
 
       // Apply per-prayer offsets
       final adjusted = raw.applyOffsets(ps.offsets);
@@ -77,8 +80,12 @@ class _SalahScreenState extends State<SalahScreen> {
       // Post-offset sanity check
       if (!adjusted.sanityCheck()) {
         debugPrint('[SalahScreen] ⚠️ Post-offset sanity check failed');
-        debugPrint('[SalahScreen] Raw: Fajr=${raw.fajr} Dhuhr=${raw.dhuhr} Asr=${raw.asr} Maghrib=${raw.maghrib} Isha=${raw.isha}');
-        debugPrint('[SalahScreen] Adjusted: Fajr=${adjusted.fajr} Dhuhr=${adjusted.dhuhr} Asr=${adjusted.asr} Maghrib=${adjusted.maghrib} Isha=${adjusted.isha}');
+        debugPrint(
+          '[SalahScreen] Raw: Fajr=${raw.fajr} Dhuhr=${raw.dhuhr} Asr=${raw.asr} Maghrib=${raw.maghrib} Isha=${raw.isha}',
+        );
+        debugPrint(
+          '[SalahScreen] Adjusted: Fajr=${adjusted.fajr} Dhuhr=${adjusted.dhuhr} Asr=${adjusted.asr} Maghrib=${adjusted.maghrib} Isha=${adjusted.isha}',
+        );
         if (mounted) {
           setState(() {
             // Keep previous timings if available, show error
@@ -92,13 +99,14 @@ class _SalahScreenState extends State<SalahScreen> {
       if (mounted) {
         setState(() {
           _timings = adjusted;
+          _offlineCached = result.offlineCached;
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = 'Could not load prayer times. Check internet and retry.';
           _loading = false;
         });
       }
@@ -117,9 +125,7 @@ class _SalahScreenState extends State<SalahScreen> {
     final tc = ThemeScope.of(context).current;
 
     if (_loading && _timings == null) {
-      return Center(
-        child: CircularProgressIndicator(color: tc.accent),
-      );
+      return Center(child: CircularProgressIndicator(color: tc.accent));
     }
 
     final t = _timings;
@@ -128,7 +134,12 @@ class _SalahScreenState extends State<SalahScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error ?? 'Unknown error', style: AppTypography.caption(tc)),
+            Text(
+              _error ??
+                  'Could not load prayer times. Check internet and retry.',
+              style: AppTypography.caption(tc),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.s16),
             ElevatedButton(onPressed: _load, child: const Text('Retry')),
           ],
@@ -163,11 +174,48 @@ class _SalahScreenState extends State<SalahScreen> {
           ),
           const SizedBox(height: SalahLayout.headerMarginBottom),
 
+          // ── Default location banner (first launch denied or fallback) ──
+          if (widget.locationNotifier.showDefaultLocationBanner)
+            Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: SalahLayout.screenPadding,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s12,
+                vertical: AppSpacing.s8,
+              ),
+              decoration: BoxDecoration(
+                color: tc.card,
+                borderRadius: BorderRadius.circular(AppSpacing.s8),
+                border: Border.all(color: tc.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    MdiIcons.mapMarkerOffOutline,
+                    size: 16,
+                    color: tc.textMuted,
+                  ),
+                  const SizedBox(width: AppSpacing.s8),
+                  Expanded(
+                    child: Text(
+                      'Using default location',
+                      style: AppTypography.caption(tc),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (widget.locationNotifier.showDefaultLocationBanner)
+            const SizedBox(height: AppSpacing.s8),
+
           // ── Error banner ──
           if (_error != null)
             Container(
               margin: const EdgeInsets.symmetric(
-                  horizontal: SalahLayout.screenPadding),
+                horizontal: SalahLayout.screenPadding,
+              ),
               padding: const EdgeInsets.all(AppSpacing.s8),
               decoration: BoxDecoration(
                 color: tc.card,
@@ -176,11 +224,41 @@ class _SalahScreenState extends State<SalahScreen> {
               child: Text(_error!, style: AppTypography.caption(tc)),
             ),
 
+          // ── Offline cached banner ──
+          if (_offlineCached)
+            Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: SalahLayout.screenPadding,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s12,
+                vertical: AppSpacing.s8,
+              ),
+              decoration: BoxDecoration(
+                color: tc.card,
+                borderRadius: BorderRadius.circular(AppSpacing.s8),
+                border: Border.all(color: tc.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(MdiIcons.wifiOff, size: 16, color: tc.textMuted),
+                  const SizedBox(width: AppSpacing.s8),
+                  Expanded(
+                    child: Text(
+                      'Offline (cached)',
+                      style: AppTypography.caption(tc),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // ── Date row ──
           const SizedBox(height: SalahLayout.dateRowMarginTop),
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: SalahLayout.screenPadding),
+              horizontal: SalahLayout.screenPadding,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -188,10 +266,9 @@ class _SalahScreenState extends State<SalahScreen> {
                 Text(
                   t.hijriFormatted,
                   textDirection: TextDirection.ltr,
-                  style: AppTypography.caption(tc).copyWith(
-                    color: tc.accent,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTypography.caption(
+                    tc,
+                  ).copyWith(color: tc.accent, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -201,7 +278,8 @@ class _SalahScreenState extends State<SalahScreen> {
           // ── Hero countdown card ──
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: SalahLayout.screenPadding),
+              horizontal: SalahLayout.screenPadding,
+            ),
             child: NextPrayerCard(
               name: next?.name ?? '—',
               countdown: _formatCountdown(countdown),
@@ -213,12 +291,15 @@ class _SalahScreenState extends State<SalahScreen> {
           // ── Schedule label ──
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: SalahLayout.screenPadding),
+              horizontal: SalahLayout.screenPadding,
+            ),
             child: Row(
               children: [
-                Icon(MdiIcons.calendarMonth,
-                    size: SalahLayout.scheduleIconSize,
-                    color: tc.textMuted),
+                Icon(
+                  MdiIcons.calendarMonth,
+                  size: SalahLayout.scheduleIconSize,
+                  color: tc.textMuted,
+                ),
                 const SizedBox(width: AppSpacing.s8),
                 Text(t.gregorianFormatted, style: AppTypography.caption(tc)),
               ],
@@ -231,7 +312,8 @@ class _SalahScreenState extends State<SalahScreen> {
             final isNext = p.name == next?.name;
             return Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: SalahLayout.screenPadding),
+                horizontal: SalahLayout.screenPadding,
+              ),
               child: Column(
                 children: [
                   PrayerRow(
@@ -249,7 +331,8 @@ class _SalahScreenState extends State<SalahScreen> {
           // ── Divider ──
           Padding(
             padding: const EdgeInsets.symmetric(
-                horizontal: SalahLayout.screenPadding),
+              horizontal: SalahLayout.screenPadding,
+            ),
             child: Column(
               children: [
                 const SizedBox(height: SalahLayout.dividerMarginTop),
@@ -263,7 +346,8 @@ class _SalahScreenState extends State<SalahScreen> {
           ...t.supplementaryPrayers.map((p) {
             return Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: SalahLayout.screenPadding),
+                horizontal: SalahLayout.screenPadding,
+              ),
               child: Column(
                 children: [
                   PrayerRow(
