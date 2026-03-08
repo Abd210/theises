@@ -68,6 +68,10 @@ class NotificationService {
     if (Platform.isAndroid) {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
+      
+      // Request exact alarm permission for Android 12+
+      await androidPlugin?.requestExactAlarmsPermission();
+      
       final granted = await androidPlugin?.requestNotificationsPermission();
       debugPrint(
           '[NOTIF] permission ${(granted ?? true) ? "granted" : "denied"}');
@@ -117,7 +121,7 @@ class NotificationService {
       body: 'Notifications are working ✅',
       scheduledDate: tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10)),
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
     debugPrint('[NOTIF] scheduled test in 10s');
   }
@@ -206,7 +210,7 @@ class NotificationService {
           body: body,
           scheduledDate: tzTime,
           notificationDetails: details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
         debugPrint('[NOTIF] scheduled $name at $tzTime id=$notifId');
         notifId++;
