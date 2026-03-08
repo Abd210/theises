@@ -1323,3 +1323,35 @@ Implemented local notifications for prayer times in both apps:
 ### Build Verification
 - **Flutter**: `flutter analyze` → **No issues found** ✅
 - **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 8 — Azkar Search + Favorites ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### What was done
+1. **Search**: Working search bar on Azkar home screen filters all 73 items across all 6 categories by Arabic text and translation. 200ms debounce. Tap result opens AzkarDetail at exact item index.
+2. **Favorites**: Bookmark icon in both Cards footer and List rows. Toggle saves/removes from storage. Accent color = saved, muted = unsaved.
+3. **Saved Azkar Screen**: Via bookmark button on Azkar home. Shows saved items with category, preview, remove. Empty state included.
+4. **Persistence**: Key `azkar_favorites_v1`, JSON array of `{categoryId, index}`.
+
+### Files changed
+| File | App | Change |
+|------|-----|--------|
+| `azkar_screen.dart` | Flutter | Search bar + results + bookmark nav |
+| `azkar_detail_screen.dart` | Flutter | `initialIndex`, bookmark toggle |
+| `saved_azkar_screen.dart` | Flutter | **[NEW]** |
+| `AzkarScreen.js` | Expo | Search bar + results + bookmark nav |
+| `AzkarDetailScreen.js` | Expo | `propInitialIndex`, bookmark toggle |
+| `SavedAzkarScreen.js` | Expo | **[NEW]** |
+
+### Manual test steps
+1. Search "Ayatul" → results from morning, evening, sleep, after_salah → tap opens correct item ✅
+2. Save item (bookmark) → exit → reopen → still saved ✅
+3. Bookmark icon on home → Saved list → tap opens detail ✅
+4. Remove from Saved screen → item gone ✅
+
+### Build Verification
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+

@@ -8,7 +8,8 @@ import '../models/azkar_data.dart';
 
 class AzkarDetailScreen extends StatefulWidget {
   final AzkarCategory category;
-  const AzkarDetailScreen({super.key, required this.category});
+  final int initialIndex;
+  const AzkarDetailScreen({super.key, required this.category, this.initialIndex = 0});
 
   @override
   State<AzkarDetailScreen> createState() => _AzkarDetailScreenState();
@@ -19,16 +20,19 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
   int _currentIndex = 0;
   int _viewMode = 0; // 0=Cards, 1=List
   late List<int> _counters;
+  Set<String> _favorites = {};
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex.clamp(0, widget.category.items.length - 1);
     _counters = List.filled(widget.category.items.length, 0);
-    _pageController = PageController();
+    _pageController = PageController(initialPage: _currentIndex);
     debugPrint(
       '[AzkarData] categoryKey=${widget.category.id}, itemCount=${widget.category.items.length}',
     );
     _loadProgress();
+    _loadFavorites();
     _saveLastCategory();
   }
 
@@ -87,6 +91,40 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
     });
     _saveProgress();
   }
+
+  // ── Favorites ──
+  String _favId(int index) => '${widget.category.id}:$index';
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('azkar_favorites_v1');
+    if (raw != null) {
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      setState(() {
+        _favorites = list.map((e) => '${e['categoryId']}:${e['index']}').toSet();
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite(int index) async {
+    final id = _favId(index);
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('azkar_favorites_v1');
+    List<Map<String, dynamic>> list = [];
+    if (raw != null) {
+      list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    }
+    if (_favorites.contains(id)) {
+      list.removeWhere((e) => e['categoryId'] == widget.category.id && e['index'] == index);
+      setState(() => _favorites.remove(id));
+    } else {
+      list.add({'categoryId': widget.category.id, 'index': index});
+      setState(() => _favorites.add(id));
+    }
+    await prefs.setString('azkar_favorites_v1', jsonEncode(list));
+  }
+
+  bool _isFavorite(int index) => _favorites.contains(_favId(index));
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +382,7 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 16),
                   // Counter display
                   Text(
                     '$count / ${item.repeatCount}',
@@ -355,7 +393,7 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                       color: done ? tc.accent : tc.textPrimary,
                     ),
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 16),
                   // Increment
                   GestureDetector(
                     onTap: () => _increment(index),
@@ -367,6 +405,16 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.add, size: 24, color: tc.accent),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Bookmark
+                  GestureDetector(
+                    onTap: () => _toggleFavorite(index),
+                    child: Icon(
+                      _isFavorite(index) ? Icons.bookmark : Icons.bookmark_outline,
+                      size: 22,
+                      color: _isFavorite(index) ? tc.accent : tc.textMuted,
                     ),
                   ),
                 ],
@@ -429,12 +477,14 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     if (item.translation.isNotEmpty)
-                      Text(
-                        item.translation,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: tc.textMuted,
-                          fontFamily: 'Inter',
+                      Expanded(
+                        child: Text(
+                          item.translation,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: tc.textMuted,
+                            fontFamily: 'Inter',
+                          ),
                         ),
                       ),
                     if (item.translation.isEmpty) const Spacer(),
@@ -445,6 +495,15 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: done ? tc.accent : tc.textMuted,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => _toggleFavorite(index),
+                      child: Icon(
+                        _isFavorite(index) ? Icons.bookmark : Icons.bookmark_outline,
+                        size: 20,
+                        color: _isFavorite(index) ? tc.accent : tc.textMuted,
                       ),
                     ),
                   ],

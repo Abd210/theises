@@ -17,7 +17,7 @@ const CARD_MAX_W = SCREEN_W - AzkarLayout.screenPadding * 2;
 // ════════════════════════════════════════════════════════════
 // AzkarCardsPager — horizontal paging FlatList (Cards mode)
 // ════════════════════════════════════════════════════════════
-function AzkarCardsPager({ items, counters, increment, reset, currentIndex, initialIndex, onPageChange, tc, bottomInset }) {
+function AzkarCardsPager({ items, counters, increment, reset, currentIndex, initialIndex, onPageChange, tc, bottomInset, toggleFavorite, isFavorite }) {
     const flatListRef = useRef(null);
 
     const renderCard = useCallback(({ item, index }) => {
@@ -83,11 +83,15 @@ function AzkarCardsPager({ items, counters, increment, reset, currentIndex, init
                         >
                             <Icon name="plus" size={24} color={tc.accent} />
                         </TouchableOpacity>
+                        <View style={{ flex: 1 }} />
+                        <TouchableOpacity onPress={() => toggleFavorite(index)} hitSlop={8}>
+                            <Icon name={isFavorite(index) ? 'bookmark' : 'bookmark-outline'} size={22} color={isFavorite(index) ? tc.accent : tc.textMuted} />
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>
         );
-    }, [counters, tc, increment, reset]);
+    }, [counters, tc, increment, reset, toggleFavorite, isFavorite]);
 
     return (
         <FlatList
@@ -120,7 +124,7 @@ function AzkarCardsPager({ items, counters, increment, reset, currentIndex, init
 // ════════════════════════════════════════════════════════════
 // AzkarListView — vertical list (List mode)
 // ════════════════════════════════════════════════════════════
-function AzkarListView({ items, counters, increment, tc, bottomInset }) {
+function AzkarListView({ items, counters, increment, tc, bottomInset, toggleFavorite, isFavorite }) {
     const renderListItem = useCallback(({ item, index }) => {
         const count = counters[index];
         const done = count >= item.repeatCount;
@@ -151,10 +155,14 @@ function AzkarListView({ items, counters, increment, tc, bottomInset }) {
                     }]}>
                         {count} / {item.repeatCount}
                     </Text>
+                    <View style={{ width: 12 }} />
+                    <TouchableOpacity onPress={() => toggleFavorite(index)} hitSlop={8}>
+                        <Icon name={isFavorite(index) ? 'bookmark' : 'bookmark-outline'} size={20} color={isFavorite(index) ? tc.accent : tc.textMuted} />
+                    </TouchableOpacity>
                 </View>
             </TouchableOpacity>
         );
-    }, [counters, tc, increment]);
+    }, [counters, tc, increment, toggleFavorite, isFavorite]);
 
     return (
         <FlatList
@@ -173,18 +181,19 @@ function AzkarListView({ items, counters, increment, tc, bottomInset }) {
 // ════════════════════════════════════════════════════════════
 // AzkarDetailScreen — parent orchestrator
 // ════════════════════════════════════════════════════════════
-export default function AzkarDetailScreen({ category, onBack }) {
+export default function AzkarDetailScreen({ category, onBack, propInitialIndex }) {
     const { theme: tc } = useTheme();
     const typo = getTypography(tc);
     const insets = useSafeAreaInsets();
     const items = category.items;
 
     const [viewMode, setViewMode] = useState(0);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [initialIndex, setInitialIndex] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(propInitialIndex || 0);
+    const [initialIndex, setInitialIndex] = useState(propInitialIndex || 0);
     const [counters, setCounters] = useState(() => items.map(() => 0));
     const [progressLoaded, setProgressLoaded] = useState(false);
-    const currentIndexRef = useRef(0);
+    const currentIndexRef = useRef(propInitialIndex || 0);
+    const [favorites, setFavorites] = useState(new Set());
 
     useEffect(() => {
         console.log(`[AzkarData] categoryKey=${category.id}, itemCount=${items.length}`);
@@ -221,6 +230,16 @@ export default function AzkarDetailScreen({ category, onBack }) {
             } catch (_) { /* skip */ }
             setProgressLoaded(true);
         })();
+        // Load favorites
+        (async () => {
+            try {
+                const raw = await AsyncStorage.getItem('azkar_favorites_v1');
+                if (raw) {
+                    const list = JSON.parse(raw);
+                    setFavorites(new Set(list.map(e => `${e.categoryId}:${e.index}`)));
+                }
+            } catch (_) { /* skip */ }
+        })();
     }, []);
 
     const saveProgress = useCallback(async (newCounters, newIdx) => {
@@ -255,6 +274,27 @@ export default function AzkarDetailScreen({ category, onBack }) {
         setCurrentIndex(idx);
         saveProgress(counters, idx);
     }, [counters, saveProgress]);
+
+    const toggleFavorite = useCallback(async (index) => {
+        const id = `${category.id}:${index}`;
+        try {
+            const raw = await AsyncStorage.getItem('azkar_favorites_v1');
+            let list = raw ? JSON.parse(raw) : [];
+            const exists = favorites.has(id);
+            if (exists) {
+                list = list.filter(e => !(e.categoryId === category.id && e.index === index));
+                setFavorites(prev => { const s = new Set(prev); s.delete(id); return s; });
+            } else {
+                list.push({ categoryId: category.id, index });
+                setFavorites(prev => { const s = new Set(prev); s.add(id); return s; });
+            }
+            await AsyncStorage.setItem('azkar_favorites_v1', JSON.stringify(list));
+        } catch (_) { /* skip */ }
+    }, [category.id, favorites]);
+
+    const isFavorite = useCallback((index) => {
+        return favorites.has(`${category.id}:${index}`);
+    }, [category.id, favorites]);
 
     return (
         <View style={styles.container}>
@@ -328,6 +368,8 @@ export default function AzkarDetailScreen({ category, onBack }) {
                     onPageChange={handlePageChange}
                     tc={tc}
                     bottomInset={insets.bottom}
+                    toggleFavorite={toggleFavorite}
+                    isFavorite={isFavorite}
                 />
             ) : (
                 <AzkarListView
@@ -336,6 +378,8 @@ export default function AzkarDetailScreen({ category, onBack }) {
                     increment={increment}
                     tc={tc}
                     bottomInset={insets.bottom}
+                    toggleFavorite={toggleFavorite}
+                    isFavorite={isFavorite}
                 />
             )}
         </View>
@@ -417,10 +461,9 @@ const styles = StyleSheet.create({
         height: AzkarLayout.footerHeight,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         borderTopWidth: AzkarLayout.detailCardBorderWidth,
-        paddingHorizontal: 20,
-        gap: 20,
+        paddingHorizontal: 16,
+        gap: 16,
     },
     resetBtn: {
         width: 36,
