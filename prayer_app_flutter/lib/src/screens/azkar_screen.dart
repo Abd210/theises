@@ -1,13 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_themes.dart';
 import '../providers/theme_provider.dart';
 import '../models/azkar_data.dart';
 import 'azkar_detail_screen.dart';
 
-class AzkarScreen extends StatelessWidget {
+class AzkarScreen extends StatefulWidget {
   const AzkarScreen({super.key});
+
+  @override
+  State<AzkarScreen> createState() => _AzkarScreenState();
+}
+
+class _AzkarScreenState extends State<AzkarScreen> {
+  String? _lastCategoryKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastCategory();
+  }
+
+  Future<void> _loadLastCategory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.getString('azkar_last_category');
+    if (mounted && key != null) {
+      setState(() => _lastCategoryKey = key);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +53,57 @@ class AzkarScreen extends StatelessWidget {
         const SizedBox(height: AppSpacing.s16),
         // Search bar
         _buildSearchBar(tc),
-        const SizedBox(height: AppSpacing.s24),
+        const SizedBox(height: AppSpacing.s16),
+
+        // Resume card
+        if (_lastCategoryKey != null)
+          _buildResumeCard(context, tc),
+
+        const SizedBox(height: AppSpacing.s8),
         // Grid
         _buildGrid(context, tc),
         const SizedBox(height: AppSpacing.s32),
       ],
+    );
+  }
+
+  Widget _buildResumeCard(BuildContext context, ThemeColors tc) {
+    final cat = azkarCategories.firstWhere(
+      (c) => c.id == _lastCategoryKey,
+      orElse: () => azkarCategories.first,
+    );
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AzkarDetailScreen(category: cat),
+          ),
+        ).then((_) => _loadLastCategory());
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: tc.accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: tc.accent.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(MdiIcons.playCircleOutline, color: tc.accent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Resume: ${cat.title}',
+                style: AppTypography.body(tc).copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            Icon(MdiIcons.chevronRight, color: tc.accent, size: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -95,7 +163,11 @@ class AzkarScreen extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final cat = azkarCategories[index];
-        return _CategoryCard(category: cat, tc: tc);
+        return _CategoryCard(
+          category: cat,
+          tc: tc,
+          onReturn: _loadLastCategory,
+        );
       },
     );
   }
@@ -104,8 +176,9 @@ class AzkarScreen extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final AzkarCategory category;
   final ThemeColors tc;
+  final VoidCallback? onReturn;
 
-  const _CategoryCard({required this.category, required this.tc});
+  const _CategoryCard({required this.category, required this.tc, this.onReturn});
 
   IconData _getIcon(String name) {
     final map = <String, IconData>{
@@ -127,7 +200,7 @@ class _CategoryCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => AzkarDetailScreen(category: category),
           ),
-        );
+        ).then((_) => onReturn?.call());
       },
       child: Container(
         decoration: BoxDecoration(

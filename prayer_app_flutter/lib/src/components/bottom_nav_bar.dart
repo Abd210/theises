@@ -80,41 +80,48 @@ class _NavTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isActive) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: SalahLayout.pillHeight,
-          padding: const EdgeInsets.symmetric(horizontal: SalahLayout.pillPaddingH),
-          decoration: BoxDecoration(
-            color: tc.accent,
-            borderRadius: BorderRadius.circular(SalahLayout.pillRadius),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: tc.backgroundStart, size: SalahLayout.pillIconSize),
-              const SizedBox(width: AppSpacing.s8),
-              Text(
-                label,
-                style: AppTypography.caption(tc).copyWith(
-                  fontSize: SalahLayout.pillTextSize,
-                  color: tc.backgroundStart,
-                  fontWeight: FontWeight.w600,
-                ),
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
+            child: Container(
+              height: SalahLayout.pillHeight,
+              padding: const EdgeInsets.symmetric(horizontal: SalahLayout.pillPaddingH),
+              decoration: BoxDecoration(
+                color: tc.accent,
+                borderRadius: BorderRadius.circular(SalahLayout.pillRadius),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: tc.backgroundStart, size: SalahLayout.pillIconSize),
+                  const SizedBox(width: AppSpacing.s8),
+                  Text(
+                    label,
+                    style: AppTypography.caption(tc).copyWith(
+                      fontSize: SalahLayout.pillTextSize,
+                      color: tc.backgroundStart,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s8, vertical: AppSpacing.s8,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Center(
+          child: Icon(icon, color: tc.inactive, size: SalahLayout.navInactiveIconSize),
         ),
-        child: Icon(icon, color: tc.inactive, size: SalahLayout.navInactiveIconSize),
       ),
     );
   }

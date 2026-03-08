@@ -13,20 +13,22 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../providers/ThemeProvider';
 import { QuranLayout, interFont, getTypography } from '../theme/theme';
-import { fetchSurahList, getJuzStartPointer, loadCachedSurahList } from '../services/quranApi';
+import { fetchSurahList, getJuzStartPage, loadCachedSurahList } from '../services/quranApi';
 import { loadLastRead, loadRecents } from '../services/quranStorageService';
 import QuranSurahListScreen from './QuranSurahListScreen';
 import QuranReaderScreen from './QuranReaderScreen';
 import QuranBookmarksScreen from './QuranBookmarksScreen';
+import MushafPagerScreen from './MushafPagerScreen';
 
 export default function QuranScreen({ onHideNav }) {
     const { theme: tc } = useTheme();
     const typo = getTypography(tc);
 
-    const [mode, setMode] = useState('home'); // home | list | reader | bookmarks
+    const [mode, setMode] = useState('home'); // home | list | reader | bookmarks | mushaf
     const [readerBackMode, setReaderBackMode] = useState('home');
     const [selectedSurah, setSelectedSurah] = useState(null);
     const [selectedAyah, setSelectedAyah] = useState(1);
+    const [mushafPage, setMushafPage] = useState(1);
     const [listAutofocus, setListAutofocus] = useState(false);
 
     const [surahs, setSurahs] = useState([]);
@@ -53,6 +55,11 @@ export default function QuranScreen({ onHideNav }) {
             loadPersisted();
         }
     }, [mode]);
+
+    function openMushaf(page) {
+        setMushafPage(page || 1);
+        setMode('mushaf');
+    }
 
     function showMessage(message) {
         if (Platform.OS === 'android') {
@@ -113,22 +120,12 @@ export default function QuranScreen({ onHideNav }) {
         setSelectedJuz(juz);
         setOpeningJuz(juz);
         try {
-            const pointer = await getJuzStartPointer(juz);
-            if (!pointer) {
+            const pointer = await getJuzStartPage(juz);
+            if (!pointer || pointer.pageNumber == null) {
                 showMessage(`Unable to load Juz ${juz}`);
                 return;
             }
-            let surah = surahMap[pointer.surahNumber];
-            if (!surah) {
-                const refreshed = await fetchSurahList();
-                setSurahs(refreshed);
-                surah = refreshed.find((s) => s.number === pointer.surahNumber);
-            }
-            if (!surah) {
-                showMessage(`Unable to open Juz ${juz}`);
-                return;
-            }
-            openReader(surah, pointer.ayahNumber, 'home');
+            openMushaf(pointer.pageNumber);
         } catch (e) {
             showMessage(`Failed to open Juz ${juz}`);
             if (__DEV__) {
@@ -166,6 +163,15 @@ export default function QuranScreen({ onHideNav }) {
                 surah={selectedSurah}
                 initialAyahNumber={selectedAyah}
                 onBack={() => setMode(readerBackMode)}
+            />
+        );
+    }
+
+    if (mode === 'mushaf') {
+        return (
+            <MushafPagerScreen
+                initialPage={mushafPage}
+                onBack={() => setMode('home')}
             />
         );
     }
@@ -230,14 +236,20 @@ export default function QuranScreen({ onHideNav }) {
             <View style={{ height: QuranLayout.sectionGap }} />
             {sectionTitle('Continue Reading')}
             <View style={{ height: 8 }} />
-            {lastRead ? (
+            {lastRead && lastRead.pageNumber ? (
+                <ActionCard
+                    tc={tc}
+                    text={`Continue: Page ${lastRead.pageNumber}`}
+                    onPress={() => openMushaf(lastRead.pageNumber)}
+                />
+            ) : lastRead ? (
                 <ActionCard
                     tc={tc}
                     text={`Continue: ${(surahMap[lastRead.surahNumber]?.englishName || `Surah ${lastRead.surahNumber}`)} · Ayah ${lastRead.ayahNumber}`}
-                    onPress={() => openReader(surahMap[lastRead.surahNumber] || { number: lastRead.surahNumber, englishName: `Surah ${lastRead.surahNumber}`, nameAr: '' }, lastRead.ayahNumber, 'home')}
+                    onPress={() => openMushaf(1)}
                 />
             ) : (
-                <HintCard tc={tc} text="Start reading to continue here." onPress={() => setMode('list')} />
+                <ActionCard tc={tc} text="Read Quran" onPress={() => openMushaf(1)} />
             )}
 
             <View style={{ height: QuranLayout.sectionGap }} />
@@ -251,8 +263,8 @@ export default function QuranScreen({ onHideNav }) {
                     <ActionCard
                         compact
                         tc={tc}
-                        text={`${surahMap[r.surahNumber]?.englishName || `Surah ${r.surahNumber}`} · Ayah ${r.ayahNumber}`}
-                        onPress={() => openReader(surahMap[r.surahNumber] || { number: r.surahNumber, englishName: `Surah ${r.surahNumber}`, nameAr: '' }, r.ayahNumber, 'home')}
+                        text={r.pageNumber ? `Page ${r.pageNumber}` : `${surahMap[r.surahNumber]?.englishName || `Surah ${r.surahNumber}`} · Ayah ${r.ayahNumber}`}
+                        onPress={() => openMushaf(r.pageNumber || 1)}
                     />
                 </View>
             ))}

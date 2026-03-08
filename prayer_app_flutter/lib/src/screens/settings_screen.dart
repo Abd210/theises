@@ -6,17 +6,21 @@ import '../theme/app_themes.dart';
 import '../providers/theme_provider.dart';
 import '../services/location_service.dart';
 import '../services/prayer_settings_service.dart';
+import '../services/notification_service.dart';
+import '../services/notification_settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onBack;
   final LocationNotifier locationNotifier;
   final PrayerSettingsNotifier prayerSettingsNotifier;
+  final NotificationSettingsNotifier notifSettingsNotifier;
 
   const SettingsScreen({
     super.key,
     required this.onBack,
     required this.locationNotifier,
     required this.prayerSettingsNotifier,
+    required this.notifSettingsNotifier,
   });
 
   @override
@@ -95,9 +99,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: widget.onBack,
-                child: Icon(MdiIcons.arrowLeft, color: tc.textPrimary, size: 24),
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onBack,
+                  child: Center(
+                    child: Icon(MdiIcons.arrowLeft, color: tc.textPrimary, size: 24),
+                  ),
+                ),
               ),
               const SizedBox(width: AppSpacing.s12),
               Text('Settings', style: AppTypography.titleMedium(tc)),
@@ -451,7 +462,207 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: AppSpacing.s16),
 
-        _PlaceholderSection(tc: tc, title: 'Notifications', icon: MdiIcons.bellOutline),
+        // ── Notifications section ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
+          child: Text(
+            'Notifications',
+            style: AppTypography.body(tc).copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+
+        ListenableBuilder(
+          listenable: widget.notifSettingsNotifier,
+          builder: (context, _) {
+            final ns = widget.notifSettingsNotifier;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.s16),
+                decoration: BoxDecoration(
+                  color: tc.card,
+                  borderRadius: BorderRadius.circular(AppSpacing.s16),
+                  border: Border.all(color: tc.cardBorder, width: 1),
+                ),
+                child: Column(
+                  children: [
+                    // Master toggle
+                    Row(
+                      children: [
+                        Icon(MdiIcons.bellOutline, color: tc.accent, size: 20),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: Text(
+                            'Prayer Notifications',
+                            style: AppTypography.body(tc).copyWith(fontSize: 14),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 36,
+                          child: Switch.adaptive(
+                            value: ns.enabled,
+                            activeTrackColor: tc.accent,
+                            onChanged: (on) async {
+                              if (on) {
+                                final perm = await NotificationService().requestPermission();
+                                if (!perm) return;
+                              }
+                              await ns.setEnabled(on);
+                              if (!on) {
+                                await NotificationService().cancelAll();
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (ns.enabled) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                        child: Divider(color: tc.cardBorder, height: 1),
+                      ),
+
+                      // Per-prayer toggles
+                      for (final prayer in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'])
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 32),
+                              Expanded(
+                                child: Text(
+                                  prayer,
+                                  style: AppTypography.body(tc).copyWith(fontSize: 13),
+                                ),
+                              ),
+                              SizedBox(
+                                height: 32,
+                                child: Switch.adaptive(
+                                  value: ns.isPrayerEnabled(prayer),
+                                  activeTrackColor: tc.accent,
+                                  onChanged: (on) => ns.setPrayerEnabled(prayer, on),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                        child: Divider(color: tc.cardBorder, height: 1),
+                      ),
+
+                      // Lead time
+                      Row(
+                        children: [
+                          Icon(MdiIcons.clockOutline, color: tc.textMuted, size: 18),
+                          const SizedBox(width: AppSpacing.s8),
+                          Expanded(
+                            child: Text(
+                              'Notify before',
+                              style: AppTypography.body(tc).copyWith(fontSize: 13),
+                            ),
+                          ),
+                          ...NotificationSettingsNotifier.leadTimeOptions.map((mins) {
+                            final isActive = ns.leadMinutes == mins;
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: GestureDetector(
+                                onTap: () => ns.setLeadMinutes(mins),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: isActive ? tc.accent.withValues(alpha: 0.2) : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isActive ? tc.accent : tc.cardBorder,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    mins == 0 ? 'At adhan' : '${mins}m',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isActive ? tc.accent : tc.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.s16),
+
+                      // Test buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final perm = await NotificationService().requestPermission();
+                                if (perm) await NotificationService().sendTestNow();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: tc.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Send Test Now',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: tc.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final perm = await NotificationService().requestPermission();
+                                if (perm) await NotificationService().scheduleTestIn10s();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: tc.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Test in 10s',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: tc.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: SalahLayout.screenPadding),
       ],
     );
@@ -530,15 +741,22 @@ class _CounterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: tc.accent.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: tc.accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 16, color: tc.accent),
+          ),
         ),
-        child: Icon(icon, size: 16, color: tc.accent),
       ),
     );
   }
@@ -765,50 +983,3 @@ class _ThemeCard extends StatelessWidget {
   }
 }
 
-class _PlaceholderSection extends StatelessWidget {
-  final dynamic tc;
-  final String title;
-  final IconData icon;
-
-  const _PlaceholderSection({
-    required this.tc,
-    required this.title,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: SalahLayout.screenPadding),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.s16),
-        decoration: BoxDecoration(
-          color: tc.card,
-          borderRadius: BorderRadius.circular(AppSpacing.s16),
-          border: Border.all(color: tc.cardBorder, width: 1),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: tc.inactive, size: 20),
-            const SizedBox(width: AppSpacing.s12),
-            Text(
-              title,
-              style: AppTypography.body(tc).copyWith(
-                color: tc.inactive,
-                fontSize: 14,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              'Coming soon',
-              style: AppTypography.caption(tc).copyWith(
-                fontSize: 12,
-                color: tc.inactive,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

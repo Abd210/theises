@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../providers/ThemeProvider';
 import { Spacing, AzkarLayout } from '../theme/theme';
@@ -13,22 +14,44 @@ export default function AzkarScreen({ onHideNav }) {
     const { theme: tc } = useTheme();
     const typo = getTypography(tc);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [lastCategoryKey, setLastCategoryKey] = useState(null);
+
+    const loadLastCategory = useCallback(async () => {
+        try {
+            const key = await AsyncStorage.getItem('azkar_last_category');
+            setLastCategoryKey(key);
+        } catch (_) { /* skip */ }
+    }, []);
+
+    useEffect(() => {
+        loadLastCategory();
+    }, [loadLastCategory]);
 
     // Hide navbar when detail is open
     useEffect(() => {
         if (onHideNav) onHideNav(!!selectedCategory);
     }, [selectedCategory, onHideNav]);
 
+    // Reload resume state when returning from detail
+    const handleBack = useCallback(() => {
+        setSelectedCategory(null);
+        loadLastCategory();
+    }, [loadLastCategory]);
+
     if (selectedCategory) {
         return (
             <AzkarDetailScreen
                 category={selectedCategory}
-                onBack={() => setSelectedCategory(null)}
+                onBack={handleBack}
             />
         );
     }
 
     const cardWidth = (SCREEN_W - AzkarLayout.screenPadding * 2 - AzkarLayout.gridSpacing) / 2;
+
+    const lastCategory = lastCategoryKey
+        ? azkarCategories.find((c) => c.id === lastCategoryKey)
+        : null;
 
     const renderCategory = ({ item }) => (
         <TouchableOpacity
@@ -86,7 +109,31 @@ export default function AzkarScreen({ onHideNav }) {
                             <Icon name="bookmark-outline" size={20} color={tc.textMuted} />
                         </View>
                     </View>
-                    <View style={{ height: Spacing.s24 }} />
+                    <View style={{ height: Spacing.s16 }} />
+
+                    {/* Resume card */}
+                    {lastCategory && (
+                        <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => setSelectedCategory(lastCategory)}
+                            style={[styles.resumeCard, {
+                                backgroundColor: tc.accent + '14',
+                                borderColor: tc.accent + '33',
+                            }]}
+                        >
+                            <Icon name="play-circle-outline" size={20} color={tc.accent} />
+                            <Text style={[typo.body, {
+                                fontFamily: interFont('600'),
+                                fontSize: 14,
+                                flex: 1,
+                                marginLeft: 10,
+                            }]}>
+                                Resume: {lastCategory.title}
+                            </Text>
+                            <Icon name="chevron-right" size={20} color={tc.accent} />
+                        </TouchableOpacity>
+                    )}
+                    <View style={{ height: Spacing.s8 }} />
                 </View>
             }
             renderItem={renderCategory}
@@ -161,5 +208,13 @@ const styles = StyleSheet.create({
         fontFamily: interFont('400'),
         fontSize: AzkarLayout.gridSubtitleSize,
         flex: 1,
+    },
+    resumeCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        borderWidth: 1,
     },
 });

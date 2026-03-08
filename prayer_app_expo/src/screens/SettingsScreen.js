@@ -8,6 +8,8 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useLocation } from '../providers/LocationProvider';
 import { usePrayerSettings } from '../providers/PrayerSettingsProvider';
 import { METHOD_OPTIONS, SCHOOL_OPTIONS, OFFSET_PRAYERS, methodLabel, schoolLabel, autoMethodForCountry } from '../services/prayerSettingsService';
+import { useNotificationSettings, PRAYER_NAMES, LEAD_TIME_OPTIONS } from '../services/notificationSettingsService';
+import notificationService from '../services/notificationService';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -37,7 +39,7 @@ export default function SettingsScreen({ onBack }) {
                 {/* Header with back arrow */}
                 <View style={{ height: SalahLayout.headerMarginTop }} />
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onBack}>
+                    <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}>
                         <MaterialCommunityIcons name="arrow-left" size={24} color={tc.textPrimary} />
                     </TouchableOpacity>
                     <View style={{ width: Spacing.s12 }} />
@@ -202,8 +204,12 @@ export default function SettingsScreen({ onBack }) {
                 </View>
                 <View style={{ height: Spacing.s16 }} />
 
-                {/* Notifications placeholder */}
-                <PlaceholderSection tc={tc} title="Notifications" icon="bell-outline" />
+                {/* Notifications section */}
+                <View style={styles.padH}>
+                    <Text style={[typo.body, { fontWeight: '600', fontSize: 15 }]}>Notifications</Text>
+                </View>
+                <View style={{ height: Spacing.s12 }} />
+                <NotificationSection tc={tc} typo={typo} />
                 <View style={{ height: SalahLayout.screenPadding }} />
             </ScrollView>
 
@@ -357,6 +363,113 @@ function PlaceholderSection({ tc, title, icon }) {
     );
 }
 
+function NotificationSection({ tc, typo }) {
+    const ns = useNotificationSettings();
+
+    return (
+        <View style={styles.padH}>
+            <View style={[styles.card, { backgroundColor: tc.card, borderColor: tc.cardBorder }]}>
+                {/* Master toggle */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="bell-outline" size={20} color={tc.accent} />
+                    <View style={{ width: Spacing.s12 }} />
+                    <Text style={[typo.body, { flex: 1, fontSize: 14 }]}>Prayer Notifications</Text>
+                    <Switch
+                        value={ns.enabled}
+                        trackColor={{ true: tc.accent }}
+                        onValueChange={async (on) => {
+                            if (on) {
+                                const granted = await notificationService.requestPermission();
+                                if (!granted) return;
+                            }
+                            await ns.setEnabled(on);
+                            if (!on) await notificationService.cancelAll();
+                        }}
+                    />
+                </View>
+
+                {ns.enabled && (
+                    <>
+                        <View style={[styles.divider, { borderColor: tc.cardBorder }]} />
+
+                        {/* Per-prayer toggles */}
+                        {PRAYER_NAMES.map((prayer) => (
+                            <View key={prayer} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                <View style={{ width: 32 }} />
+                                <Text style={[typo.body, { flex: 1, fontSize: 13 }]}>{prayer}</Text>
+                                <Switch
+                                    value={ns.prayerEnabled[prayer] !== false}
+                                    trackColor={{ true: tc.accent }}
+                                    onValueChange={(on) => ns.setPrayerEnabled(prayer, on)}
+                                />
+                            </View>
+                        ))}
+
+                        <View style={[styles.divider, { borderColor: tc.cardBorder }]} />
+
+                        {/* Lead time */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <MaterialCommunityIcons name="clock-outline" size={18} color={tc.textMuted} />
+                            <View style={{ width: Spacing.s8 }} />
+                            <Text style={[typo.body, { flex: 1, fontSize: 13 }]}>Notify before</Text>
+                            {LEAD_TIME_OPTIONS.map((mins) => {
+                                const isActive = ns.leadMinutes === mins;
+                                return (
+                                    <TouchableOpacity
+                                        key={mins}
+                                        onPress={() => ns.setLeadMinutes(mins)}
+                                        style={{
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 5,
+                                            borderRadius: 8,
+                                            borderWidth: 1,
+                                            borderColor: isActive ? tc.accent : tc.cardBorder,
+                                            backgroundColor: isActive ? tc.accent + '33' : 'transparent',
+                                            marginLeft: 6,
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontFamily: interFont('600'),
+                                            fontSize: 12,
+                                            color: isActive ? tc.accent : tc.textMuted,
+                                        }}>
+                                            {mins === 0 ? 'At adhan' : `${mins}m`}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        <View style={{ height: Spacing.s16 }} />
+
+                        {/* Test buttons */}
+                        <View style={{ flexDirection: 'row', gap: Spacing.s8 }}>
+                            <TouchableOpacity
+                                style={[styles.testBtn, { backgroundColor: tc.accent + '1F' }]}
+                                onPress={async () => {
+                                    const granted = await notificationService.requestPermission();
+                                    if (granted) await notificationService.sendTestNow();
+                                }}
+                            >
+                                <Text style={[styles.testBtnText, { color: tc.accent }]}>Send Test Now</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.testBtn, { backgroundColor: tc.accent + '1F' }]}
+                                onPress={async () => {
+                                    const granted = await notificationService.requestPermission();
+                                    if (granted) await notificationService.scheduleTestIn10s();
+                                }}
+                            >
+                                <Text style={[styles.testBtnText, { color: tc.accent }]}>Test in 10s</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                )}
+            </View>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     scroll: { flex: 1 },
     content: { flexGrow: 1 },
@@ -366,6 +479,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: SalahLayout.screenPadding,
     },
     padH: { paddingHorizontal: SalahLayout.screenPadding },
+    spacer: { flex: 1 },
+    card: {
+        padding: Spacing.s16,
+        borderRadius: 16,
+        borderWidth: 1,
+    },
+    testBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    testBtnText: {
+        fontFamily: interFont('600'),
+        fontSize: 12,
+    },
     gridRow: { flexDirection: 'row' },
     themeCard: {
         flex: 1,
@@ -501,9 +630,15 @@ const styles = StyleSheet.create({
     counterBtn: {
         padding: 4,
         borderRadius: 6,
+        minWidth: 44,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     counterValueWrap: {
         minWidth: 40,
+        minHeight: 44,
+        justifyContent: 'center',
         alignItems: 'center',
     },
     counterValue: {

@@ -4,6 +4,7 @@ import 'src/theme/app_themes.dart';
 import 'src/providers/theme_provider.dart';
 import 'src/services/location_service.dart';
 import 'src/services/prayer_settings_service.dart';
+import 'src/services/notification_settings_service.dart';
 import 'src/components/screen_container.dart';
 import 'src/components/bottom_nav_bar.dart';
 import 'src/screens/salah_screen.dart';
@@ -16,11 +17,13 @@ import 'src/screens/quran_screen.dart';
 final ThemeProvider _themeProvider = ThemeProvider();
 final LocationNotifier locationNotifier = LocationNotifier();
 final PrayerSettingsNotifier prayerSettingsNotifier = PrayerSettingsNotifier();
+final NotificationSettingsNotifier notifSettingsNotifier = NotificationSettingsNotifier();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _themeProvider.loadTheme();
   await prayerSettingsNotifier.load();
+  await notifSettingsNotifier.load();
   // Load saved location at startup. Run first-launch permission flow after UI mounts
   // so Android does not stall on a black/splash screen during app bootstrap.
   await locationNotifier.load();
@@ -93,6 +96,7 @@ class _AppShellState extends State<AppShell> {
                       onBack: () => setState(() => _showSettings = false),
                       locationNotifier: locationNotifier,
                       prayerSettingsNotifier: prayerSettingsNotifier,
+                      notifSettingsNotifier: notifSettingsNotifier,
                     )
                   : _buildScreen(tc),
             ),

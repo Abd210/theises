@@ -1062,3 +1062,264 @@ Both apps ✅
 ### Parity check
 - Flutter ✅
 - Expo ✅
+
+---
+
+## Step 6.0.1 — Touch Targets (44×44pt Minimum Hit Areas) ✅
+**Date**: 2026-03-07 | **Status**: Complete
+
+### What was done
+Expanded invisible touch/hit areas to ≥ 44×44pt on all interactive elements across both apps, **without changing the visual UI** (same icon sizes, spacing, layout, colors). This ensures reliable tapping on large phones (iPhone 14 Pro Max, etc.).
+
+### Components Changed
+
+| Component | Before | After | Technique |
+|-----------|--------|-------|-----------|
+| `AppIconButton` (gear, bookmark) | 36×36 hit area | 44×44 hit area | Flutter: SizedBox(44,44) wrapper; Expo: hitSlop |
+| Bottom nav inactive tabs | ~38×38 (padding+icon) | 44×44 min | Flutter: ConstrainedBox; Expo: minHeight/minWidth |
+| Bottom nav active pill | 36px height | 44px min height | Same approach |
+| Settings back arrow | ~24×24 (bare icon) | 44×44 hit area | Flutter: SizedBox(44,44); Expo: hitSlop + minSize |
+| Settings +/- offset buttons | ~24×24 | 44×44 hit area | Flutter: SizedBox(44,44); Expo: minWidth/minHeight |
+| Settings offset reset tap | ~40×16 | 44×40 min | Flutter: ConstrainedBox; Expo: minHeight |
+| Azkar reset button | 36×36 circle | 44×44 hit area | Flutter: SizedBox(44,44); Expo: hitSlop |
+| Azkar increment button | 44×44 | 44×44 ✅ | Already compliant |
+| Quran reader font +/- | ~20×20 icon | 40×40+ hit area | Flutter: IconButton (48 default); Expo: hitSlop |
+| Quran reader translate/bookmark | ~20×20 icon | 40×40+ hit area | Same |
+| Quran reader back arrow | Already ≥44 | ✅ | Flutter: IconButton; Expo: hitSlop={10} |
+
+### Files Changed
+
+#### Flutter (`prayer_app_flutter/lib/`)
+| File | Change |
+|------|--------|
+| `src/components/app_icon_button.dart` | SizedBox(44,44) wrapper around 36×36 visual |
+| `src/components/bottom_nav_bar.dart` | ConstrainedBox(minHeight:44,minWidth:44) on all tabs |
+| `src/screens/settings_screen.dart` | Back arrow 44×44; `_CounterButton` 44×44 hit area |
+| `src/screens/azkar_detail_screen.dart` | Reset button SizedBox(44,44) wrapper |
+
+#### Expo (`prayer_app_expo/src/`)
+| File | Change |
+|------|--------|
+| `components/AppIconButton.js` | hitSlop based on (44 - btnSize)/2 |
+| `components/BottomNavBar.js` | minHeight/minWidth 44 on tab + activeTab |
+| `screens/SettingsScreen.js` | Back arrow hitSlop+minSize; counterBtn minWidth/minHeight 44 |
+| `screens/AzkarDetailScreen.js` | Reset button hitSlop |
+| `screens/QuranReaderScreen.js` | hitSlop on font ±, translate, bookmark buttons |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| AppIconButton ≥ 44 hit area | ✅ | ✅ | ✅ |
+| Nav tabs ≥ 44 hit area | ✅ | ✅ | ✅ |
+| Settings back arrow ≥ 44 | ✅ | ✅ | ✅ |
+| Settings +/- buttons ≥ 44 | ✅ | ✅ | ✅ |
+| Azkar reset ≥ 44 | ✅ | ✅ | ✅ |
+| Quran reader controls ≥ 44 | ✅ | ✅ | ✅ |
+| Visual UI unchanged | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 5 (Rework) — Quran Mushaf Pages (Horizontal Swipe) ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### What was done
+Replaced the surah-based Quran reader with a **page-based Mushaf pager** (pages 1–604). Users swipe horizontally through pages like a real mushaf. Continue Reading and Recents now reliably save/restore page position. Juz jump resolves to the correct starting page via the API.
+
+### API Endpoints Used
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /v1/page/{N}/quran-uthmani` | Fetch Arabic ayahs for page N |
+| `GET /v1/page/{N}/en.sahih` | Fetch English translation for page N |
+| `GET /v1/juz/{N}/quran-uthmani` | Get first ayah → read `.page` field for Juz start page |
+
+### Milestones
+1. **Milestone A — MushafPager UI**: Horizontal pager (PageView.builder / FlatList), top bar (Page X / 604, Juz Y, font ±, translation toggle), per-page fetch with ±1 prefetch, surah headers, floating bottom bar with prev/next
+2. **Milestone B — Continue Reading + Recents**: `QuranPointer` now includes `pageNumber`; saved on every page swipe via `setLastRead`/`pushRecent`; opens at saved page
+3. **Milestone C — Correct Juz Jump**: `getJuzStartPage(juz)` calls the juz endpoint, reads `data.ayahs[0].page`, opens MushafPager at that page. Debug log: `[JUZ] juz=N -> startPage=P`
+4. **Milestone D — Translation Toggle**: Loads `/page/{N}/en.sahih`, merges by global ayah number, shows under Arabic text
+
+### How to Test Juz 1 Correctness
+1. Open app → Quran tab → tap "Juz 1"
+2. Console log should show: `[JUZ] juz=1 -> startPage=1 -> firstAyah surah:1 ayah:1`
+3. MushafPager opens at page 1 showing Al-Fatiha (all 7 ayahs)
+4. Swipe left → page 2 should show beginning of Al-Baqara
+
+### Files Changed
+
+#### Flutter (`prayer_app_flutter/lib/src/`)
+| File | Change |
+|------|--------|
+| `models/quran_models.dart` | Added `PageAyah` class, `pageNumber` field to `QuranPointer` |
+| `services/quran_api_service.dart` | Added `fetchPageArabic`, `fetchPageTranslation`, `getJuzStartPage`, `mergePageArabicAndEnglish` |
+| `screens/mushaf_pager_screen.dart` | **[NEW]** Mushaf pager with PageView.builder |
+| `screens/quran_screen.dart` | Rewired Continue Reading/Recents/Juz to use MushafPager |
+
+#### Expo (`prayer_app_expo/src/`)
+| File | Change |
+|------|--------|
+| `models/quranModels.js` | Added `toPageAyah`, `toPageAyahEnglish`, `mergePageArabicAndEnglish`, updated `pointerKey` |
+| `services/quranApi.js` | Added `fetchPageArabic`, `fetchPageTranslation`, `getJuzStartPage` |
+| `screens/MushafPagerScreen.js` | **[NEW]** Mushaf pager with FlatList horizontal paging |
+| `screens/QuranScreen.js` | Rewired Continue Reading/Recents/Juz to use MushafPager |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| Horizontal page swipe | ✅ | ✅ | ✅ |
+| Page number + Juz display | ✅ | ✅ | ✅ |
+| Surah headers between surahs | ✅ | ✅ | ✅ |
+| Continue Reading saves page | ✅ | ✅ | ✅ |
+| Recents show "Page X" | ✅ | ✅ | ✅ |
+| Juz jump → correct start page | ✅ | ✅ | ✅ |
+| Translation toggle | ✅ | ✅ | ✅ |
+| Floating bottom nav bar | ✅ | ✅ | ✅ |
+| Font size ± | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+
+---
+
+## Step 7 — Offline-First Caching (7-Day Prayer + Location + Azkar Resume + Settings) ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### What was done
+Implemented robust offline-first caching for prayer times, Azkar resume, and verified location/settings persistence in both apps.
+
+### A) Prayer Times — 7-Day Cache + Day Navigation
+
+**API change**: Switched from single-day `/v1/timings/{date}` to monthly `/v1/calendar` endpoint.
+- Fetches full month data, caches raw JSON per month with 7-day TTL
+- Extracts 7 days (today..today+6) from cached month(s)
+- Stale-while-revalidate: returns stale cache with `offlineCached` flag on network failure
+
+**Day navigation**: SalahScreen now has 7-page horizontal swipe:
+- Flutter: `PageView.builder` with 7 pages
+- Expo: `FlatList` horizontal paging with 7 items
+- Day selector dots + day label ("Today", "Tomorrow", "Wed, Mar 11")
+- Countdown timer only active on Today page
+
+**Cache keys**: `prayer_cal_{YYYY}_{MM}` + `prayer_cal_saved_{YYYY}_{MM}`
+
+### C) Azkar Resume
+- Both apps save `azkar_last_category` when opening a category
+- Grid screens show "Resume: {title}" card when lastCategoryKey exists
+
+### B) Location + D) Settings
+Already fully persisted from earlier steps — verified working.
+
+### Files Changed
+
+#### Flutter (`prayer_app_flutter/lib/src/`)
+| File | Change |
+|------|--------|
+| `services/cache_service.dart` | Expanded: monthly cache with TTL |
+| `services/prayer_api.dart` | Rewrote: `fetchWeek()` with calendar endpoint |
+| `models/prayer_times.dart` | Added `fromCalendarDay` factory |
+| `screens/salah_screen.dart` | 7-day PageView + day dots |
+| `screens/azkar_screen.dart` | StatefulWidget + resume card |
+| `screens/azkar_detail_screen.dart` | Save `azkar_last_category` |
+
+#### Expo (`prayer_app_expo/src/`)
+| File | Change |
+|------|--------|
+| `services/prayerCacheService.js` | **[NEW]** Monthly cache |
+| `services/prayerApi.js` | Rewrote: `fetchWeekPrayerTimes()` |
+| `screens/SalahScreen.js` | 7-day FlatList paging |
+| `screens/AzkarScreen.js` | Resume card |
+| `screens/AzkarDetailScreen.js` | Save `azkar_last_category` |
+
+### Parity Check
+| Feature | Flutter ✅ | Expo ✅ | Match |
+|---------|-----------|---------|-------|
+| Calendar API endpoint | ✅ | ✅ | ✅ |
+| Monthly cache + 7-day TTL | ✅ | ✅ | ✅ |
+| 7-day swipe navigation | ✅ | ✅ | ✅ |
+| Azkar resume card | ✅ | ✅ | ✅ |
+| Location cache | ✅ | ✅ | ✅ |
+| Settings persistence | ✅ | ✅ | ✅ |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 7.1 — Parity Fix: Expo Azkar Resume + Salah Dots Position ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### 1) Expo Azkar Resume Bug
+**Root cause**: `AzkarCardsPager` mounted with `currentIndex=0` before AsyncStorage loaded saved progress. The `useEffect([], [])` for `scrollToIndex` ran once at mount with index 0 and never re-fired.
+
+**Fix**:
+- Added `progressLoaded` state gate — pager doesn't render until AsyncStorage load completes
+- Added `initialIndex` prop + `initialScrollIndex` on FlatList
+- Added `onScrollToIndexFailed` retry (100ms setTimeout)
+- Added `[AZKAR_RESUME]` debug log with categoryKey/savedLastIndex/itemsLen
+- Verified: open card 5 → exit → reopen → lands on card 5
+
+### 2) Salah Dots Position
+**Change**: Moved day selector dots + day label from the fixed header area into each day page's scroll content (after supplementary prayer rows). Now dots appear near the bottom of the schedule.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| Expo `AzkarDetailScreen.js` | progressLoaded gate, initialScrollIndex, onScrollToIndexFailed, [AZKAR_RESUME] log |
+| Flutter `salah_screen.dart` | Dots moved from _buildHeaderArea to _buildDayContent |
+| Expo `SalahScreen.js` | Dots moved from header to renderDayPage |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 7.2 — Parity Fix: Salah Pager Scroll Area Refactor ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### What was changed
+Restructured both Flutter and Expo Salah screens so that the top section (Date row with Gregorian/Hijri dates and the Hero countdown card) remains fixed at the top of the screen. Only the schedule block below it (main prayers, divider, supplementary prayers, and day selector dots) is part of the horizontal swipe pager.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| Flutter `salah_screen.dart` | Extracted Date row and Hero card from `_buildDayContent` into `_buildFixedDateAndHero()`, called above the `PageView`. |
+| Expo `SalahScreen.js` | Extracted Date row and Hero card from `renderDayPage` into `renderFixedDateAndHero()`, called above the `FlatList`. |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Step 7 — Prayer Notifications (Offline-First) ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### What was changed
+Implemented local notifications for prayer times in both apps:
+- **Notification Service**: init, test (immediate + 10s scheduled), prayer scheduling using cached 7-day timings, cancel all
+- **Settings**: Master toggle, per-prayer ON/OFF toggles (Fajr/Dhuhr/Asr/Maghrib/Isha), lead time selector (0/5/10 min)
+- **UI**: Bell icon on Salah header for instant test, full notification section in Settings with test buttons
+- **Provider Wiring**: NotificationSettingsNotifier (Flutter) + NotificationSettingsProvider (Expo) in app roots
+
+### Dependencies Added
+- Flutter: `flutter_local_notifications`, `timezone`
+- Expo: `expo-notifications`
+
+### New Files
+| File | App |
+|------|-----|
+| `notification_service.dart` | Flutter |
+| `notification_settings_service.dart` | Flutter |
+| `notificationService.js` | Expo |
+| `notificationSettingsService.js` | Expo |
+
+### Build Verification
+- **Flutter**: `flutter analyze` → **No issues found** ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅

@@ -1,101 +1,53 @@
-# Step 5 — Quran (API + Core Polish + Juz Browsing)
+# Step 5 (Rework) — Quran Mushaf Pages
 
-## What I built
+## What I Did
 
-I completed Quran in both apps with parity, then added Juz browsing and fixed the Home search bar mismatch between Flutter and Expo.
+Ripped out the old surah-based Quran reader and replaced it with a page-based Mushaf pager. The Quran now shows pages 1–604, swiped horizontally like a real mushaf book.
 
-### API and editions (same in both apps)
-- Base: `https://api.alquran.cloud/v1`
-- Surah endpoints:
-  - `GET /surah`
-  - `GET /surah/{surahNumber}/quran-uthmani`
-  - `GET /surah/{surahNumber}/en.sahih`
-- Juz endpoints:
-  - `GET /juz/{juzNumber}/quran-uthmani`
-  - `GET /juz/{juzNumber}/en.sahih`
-- Editions locked:
-  - Arabic: `quran-uthmani`
-  - English: `en.sahih`
+## The Journey
 
-### Caching keys now used
-- Surah list: `quran_surah_list_v1`
-- Surah Arabic: `quran_surah_{n}_quran-uthmani_v1`
-- Surah English: `quran_surah_{n}_en.sahih_v1`
-- Juz Arabic: `quran_juz_{j}_quran-uthmani_v1`
-- Juz English: `quran_juz_{j}_en.sahih_v1`
+### Starting Point
+The previous reader loaded one surah at a time, scrolled vertically. Juz selection was broken because `getJuzStartPointer` returned a surah/ayah pair and opened the surah-level reader, which didn't even correctly position within the surah for most Juz boundaries.
 
-### Persistence keys (same both apps)
-- `quran_last_read`
-- `quran_recents`
-- `quran_bookmarks`
+### API Discovery
+The `api.alquran.cloud/v1/page/{N}` endpoint was the key. Each page response includes ayahs with `surah`, `juz`, `page`, `numberInSurah` — everything needed to render a mushaf page and determine Juz boundaries without manual mapping.
 
-## Feature status (both apps)
+### Building the Pager
+- **Flutter**: `PageView.builder` with 604 items. Each page fetches ayahs on demand. Only current page + ±1 prefetch to avoid loading all 604 pages at once.
+- **Expo**: `FlatList` with `horizontal` + `pagingEnabled` + `getItemLayout` for snapping. Same on-demand fetch logic.
 
-### Quran Home
-- polished header + subtitle
-- search entry to Surah List
-- Continue card + empty hint
-- Recents (top 3)
-- 2-row horizontal Juz chip selector
-- Juz chip tap now opens Reader at Juz start ayah (real API-backed)
+### Hardest Part
+Getting the Expo `FlatList` to behave like Flutter's `PageView` was finicky. The key was `getItemLayout` (giving exact width per item = screen width) plus `pagingEnabled` for snap behavior. Without `getItemLayout`, scroll-to-index fails.
 
-### Surah List
-- loads `/surah` with cache-first behavior + offline banner fallback
-- search by number + English + Arabic
+### Juz Fix
+The old approach called `getJuzStartPointer(juz)` which returned a surah+ayah and then tried to load that surah's reader. The fix: call the juz endpoint, read `data.ayahs[0].page`, and open the Mushaf pager at that page. Simple and correct.
 
-### Reader
-- Arabic always loaded
-- translation toggle loads English edition
-- font +/-
-- bookmark toggle
-- jump-to-ayah on open
-- brief flash highlight for target ayah
-- lastRead updates while reading
+## Differences Between Flutter and Expo
 
-### Bookmarks
-- real bookmarks list
-- Arabic preview snippet (~30 chars)
-- long-press delete
-- tap opens Reader at ayah
+| Aspect | Flutter | Expo |
+|--------|---------|------|
+| Pager widget | `PageView.builder` (built-in) | `FlatList` horizontal + `pagingEnabled` |
+| Page change detection | `onPageChanged` callback | `onViewableItemsChanged` |
+| Scroll-to-page | `pageController.animateToPage` | `flatListRef.scrollToIndex` |
+| Translation merge | Instance method on API service | Standalone exported function |
 
-## What was fixed in this iteration
+## What Changed
+- New `PageAyah` model in both apps (includes `juz`, `page`, `surahNumber`, `globalNumber`)
+- `QuranPointer` now has optional `pageNumber` field
+- New `MushafPagerScreen` in both apps
+- `QuranScreen` home rewired: Continue/Recents/Juz all open MushafPager
+- Old surah-based reader files kept but no longer navigated to from home
 
-1. **Juz browsing implemented**
-- Before: chips were UI-only.
-- Now: chip -> resolve Juz start pointer from cached/fetched Juz Arabic ayahs -> open Reader.
+## Parity Fixes
 
-2. **Search bar mismatch fixed**
-- Before: Flutter and Expo search bars had different visual treatment (gradient mismatch).
-- Now: both use the same glass-card style (`card` bg + `cardBorder`, same token radius/height).
+### Bottom Bar Overlap (Expo)
+First version of the Expo bottom bar used `position: 'absolute'`, which caused it to float over the ayah content. Flutter's bar was part of a `Column` layout (below the `Expanded` PageView), so it never overlapped. Fix: removed `position: absolute` from Expo, wrapped `FlatList` in a `flex:1` View, and used `marginHorizontal/marginBottom` instead — matching Flutter's Column-based layout exactly.
 
-## What went wrong / fixes
+### Bottom Bar Height Mismatch
+Flutter's `IconButton` widget enforces a default 48×48 minimum touch area. Expo's `TouchableOpacity` only wrapped the 24px icon, making the bar visibly shorter. Fix: added a `navBtn` style (`width: 48, height: 48, alignItems: 'center', justifyContent: 'center'`) to both chevron buttons, matching Flutter's `IconButton` sizing. The bottom bar now renders at the same height in both apps.
 
-1. **Prompt path mismatch**
-- Prompt asked for `/docs/AGENT_INSTRUCTIONS.md`, file not present.
-- Used root `AGENT_INSTRUCTIONS.md`.
+### Key Takeaway
+Flutter's `IconButton` silently enforces a 48×48 minimum — something easy to miss when porting to Expo where `TouchableOpacity` has no such default. Always check rendered sizes side-by-side, not just code structure.
 
-2. **Flutter analyze sandbox write restriction**
-- Needed elevated permissions to run `flutter analyze` (SDK cache writes).
-
-3. **Previous visual mismatch root cause**
-- Flutter search used a high alpha gradient stop (`withValues(alpha: 0.85)`), producing a much brighter look than Expo.
-- Fixed by removing special gradient and using same base style in both apps.
-
-## Real Flutter vs Expo differences (implementation only)
-
-- Juz open implementation uses the same logic but different async/state wiring:
-  - Flutter: stateful widget + async `onTap` + `Navigator.push`
-  - Expo: state-mode navigation + async `onTap` + React state updates
-- Both now show loading state on the tapped Juz chip while opening.
-
-## Verification
-
-- Flutter: `flutter analyze` completed; only pre-existing Azkar warnings remain.
-- Expo: `npx expo export --platform ios` passed.
-
-## Parity status
-
-- Flutter ✅
-- Expo ✅
-
-This step now includes real Juz browsing + visual search-bar parity in both apps.
+## Parity Status
+Flutter ✅ | Expo ✅ — Both apps show identical Mushaf pager UI.

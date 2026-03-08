@@ -7,8 +7,14 @@ import 'app_icon_button.dart';
 class AppHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onSettingsTap;
+  final VoidCallback? onTestNotification;
 
-  const AppHeader({super.key, required this.title, this.onSettingsTap});
+  const AppHeader({
+    super.key,
+    required this.title,
+    this.onSettingsTap,
+    this.onTestNotification,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,14 +41,29 @@ class AppHeader extends StatelessWidget {
               ),
             ],
           ),
-          AppIconButton(
-            icon: MdiIcons.cogOutline,
-            size: SalahLayout.gearButtonSize,
-            iconSize: SalahLayout.gearIconSize,
-            onTap: onSettingsTap ?? () {},
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onTestNotification != null)
+                AppIconButton(
+                  icon: MdiIcons.bellOutline,
+                  size: SalahLayout.gearButtonSize,
+                  iconSize: SalahLayout.gearIconSize,
+                  onTap: onTestNotification!,
+                ),
+              if (onTestNotification != null)
+                const SizedBox(width: 4),
+              AppIconButton(
+                icon: MdiIcons.cogOutline,
+                size: SalahLayout.gearButtonSize,
+                iconSize: SalahLayout.gearIconSize,
+                onTap: onSettingsTap ?? () {},
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+

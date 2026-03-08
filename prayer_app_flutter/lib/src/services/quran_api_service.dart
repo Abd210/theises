@@ -161,6 +161,76 @@ class QuranApiService {
     );
   }
 
+  /// Juz start pointer with page number (for Mushaf pager)
+  Future<QuranPointer?> getJuzStartPage(int juzNumber) async {
+    final url = '$_base/juz/$juzNumber/$arabicEdition';
+    try {
+      final response = await _get(url);
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = json['data'] as Map<String, dynamic>;
+      final ayahs = data['ayahs'] as List<dynamic>;
+      if (ayahs.isEmpty) return null;
+      final first = ayahs.first as Map<String, dynamic>;
+      final surah = first['surah'] as Map<String, dynamic>? ?? const {};
+      final page = first['page'] as int? ?? 1;
+      final surahNum = surah['number'] as int? ?? 1;
+      final ayahNum = first['numberInSurah'] as int? ?? 1;
+      debugPrint('[JUZ] juz=$juzNumber -> startPage=$page -> firstAyah surah:$surahNum ayah:$ayahNum');
+      return QuranPointer(
+        surahNumber: surahNum,
+        ayahNumber: ayahNum,
+        pageNumber: page,
+      );
+    } catch (e) {
+      debugPrint('[JUZ] Failed to get start page for juz $juzNumber: $e');
+      return null;
+    }
+  }
+
+  Future<List<PageAyah>> fetchPageArabic(int pageNumber) async {
+    final url = '$_base/page/$pageNumber/$arabicEdition';
+    final response = await _get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load page $pageNumber Arabic');
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as Map<String, dynamic>;
+    final ayahs = data['ayahs'] as List<dynamic>;
+    return ayahs
+        .whereType<Map<String, dynamic>>()
+        .map((a) => PageAyah.fromApi(a))
+        .toList();
+  }
+
+  Future<List<PageAyah>> fetchPageTranslation(int pageNumber) async {
+    final url = '$_base/page/$pageNumber/$englishEdition';
+    final response = await _get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load page $pageNumber translation');
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as Map<String, dynamic>;
+    final ayahs = data['ayahs'] as List<dynamic>;
+    return ayahs
+        .whereType<Map<String, dynamic>>()
+        .map((a) => PageAyah.fromApi(a, english: true))
+        .toList();
+  }
+
+  List<PageAyah> mergePageArabicAndEnglish({
+    required List<PageAyah> arabic,
+    required List<PageAyah> english,
+  }) {
+    final byGlobal = <int, String>{};
+    for (final a in english) {
+      if (a.textEn != null) byGlobal[a.globalNumber] = a.textEn!;
+    }
+    return arabic
+        .map((a) => a.copyWith(textEn: byGlobal[a.globalNumber]))
+        .toList();
+  }
+
   List<Ayah> mergeArabicAndEnglish({
     required List<Ayah> arabic,
     required List<Ayah> english,

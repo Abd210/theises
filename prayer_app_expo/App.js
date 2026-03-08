@@ -14,6 +14,7 @@ import { getTypography } from './src/theme/theme';
 import { ThemeProvider, useTheme } from './src/providers/ThemeProvider';
 import { LocationProvider } from './src/providers/LocationProvider';
 import { PrayerSettingsProvider } from './src/providers/PrayerSettingsProvider';
+import { NotificationSettingsProvider } from './src/services/notificationSettingsService';
 import ScreenContainer from './src/components/ScreenContainer';
 import BottomNavBar from './src/components/BottomNavBar';
 import SalahScreen from './src/screens/SalahScreen';
@@ -50,7 +51,9 @@ export default function App() {
             <ThemeProvider>
                 <LocationProvider>
                     <PrayerSettingsProvider>
-                        <AppContent />
+                        <NotificationSettingsProvider>
+                            <AppContent />
+                        </NotificationSettingsProvider>
                     </PrayerSettingsProvider>
                 </LocationProvider>
             </ThemeProvider>

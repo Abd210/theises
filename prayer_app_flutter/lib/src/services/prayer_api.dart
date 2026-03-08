@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -6,116 +5,136 @@ import '../models/prayer_times.dart';
 import 'cache_service.dart';
 import 'location_service.dart';
 
-class PrayerFetchResult {
-  final PrayerTimings timings;
+class PrayerWeekResult {
+  /// Date-keyed map (YYYY-MM-DD → PrayerTimings) for 7 days.
+  final Map<String, PrayerTimings> week;
   final bool offlineCached;
 
-  const PrayerFetchResult({required this.timings, required this.offlineCached});
+  const PrayerWeekResult({required this.week, required this.offlineCached});
 }
 
 class PrayerApiService {
-  static const String _baseUrl = 'https://api.aladhan.com/v1/timings';
+  static const String _calendarUrl = 'https://api.aladhan.com/v1/calendar';
 
   final CacheService _cache = CacheService();
 
-  Future<PrayerFetchResult> fetchToday({
+  /// Date key format used everywhere: YYYY-MM-DD
+  static String dateKey(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+  /// Fetch prayer times for 7 days (today..today+6).
+  /// Uses the monthly calendar endpoint and caches full months.
+  Future<PrayerWeekResult> fetchWeek({
     required int methodId,
     required int school,
   }) async {
-    // Read detected/persisted location
     final locSvc = LocationService();
     final loc = await locSvc.loadSaved();
-
     final now = DateTime.now();
-    final dateStr = DateFormat('dd-MM-yyyy').format(now);
 
-    // Cache key includes coords so changing location forces re-fetch
-    final cacheTag =
-        '${dateStr}_${loc.lat.toStringAsFixed(2)}_${loc.lon.toStringAsFixed(2)}_${methodId}_$school';
+    // Determine which months we need (today..today+6 might span 2 months)
+    final dates = List.generate(7, (i) => now.add(Duration(days: i)));
+    final monthsNeeded = <String>{};
+    for (final d in dates) {
+      monthsNeeded.add('${d.year}-${d.month}');
+    }
 
-    // Try exact-day cache first.
-    final cachedDate = await _cache.getCachedDate();
-    if (cachedDate == cacheTag) {
-      final cached = await _cache.load();
-      if (cached != null) {
-        return PrayerFetchResult(
-          timings: PrayerTimings.fromApiResponse(json.decode(cached)),
-          offlineCached: false,
-        );
+    bool anyNetworkFail = false;
+
+    // Fetch/load each needed month
+    final monthJsons = <String, String>{};
+    for (final key in monthsNeeded) {
+      final parts = key.split('-');
+      final year = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+
+      // Check cache validity
+      final valid = await _cache.isMonthValid(year, month);
+      if (valid) {
+        final cached = await _cache.loadMonth(year, month);
+        if (cached != null) {
+          monthJsons[key] = cached;
+          if (kDebugMode) {
+            debugPrint('[PRAYER_CACHE] hit month=$month year=$year');
+          }
+          continue;
+        }
+      }
+
+      // Fetch from API
+      final url =
+          '$_calendarUrl?latitude=${loc.lat}&longitude=${loc.lon}'
+          '&method=$methodId&school=$school'
+          '&month=$month&year=$year';
+
+      if (kDebugMode) debugPrint('[PRAYER_CACHE] miss month=$month year=$year');
+      if (kDebugMode) debugPrint('[PrayerAPI] calendar URL: $url');
+
+      try {
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          monthJsons[key] = response.body;
+          await _cache.saveMonth(year, month, response.body);
+        } else {
+          anyNetworkFail = true;
+          if (kDebugMode) {
+            debugPrint('[PrayerAPI] calendar failed status=${response.statusCode}');
+          }
+          // Try stale cache
+          final stale = await _cache.loadMonth(year, month);
+          if (stale != null) monthJsons[key] = stale;
+        }
+      } catch (e) {
+        anyNetworkFail = true;
+        if (kDebugMode) {
+          debugPrint('[PrayerAPI] calendar fetch error: $e');
+        }
+        // Try stale cache
+        final stale = await _cache.loadMonth(year, month);
+        if (stale != null) monthJsons[key] = stale;
       }
     }
 
-    // Fetch from API — NO timezonestring; let API auto-detect from lat/lon
-    final url =
-        '$_baseUrl/$dateStr?latitude=${loc.lat}&longitude=${loc.lon}'
-        '&method=$methodId&school=$school';
+    // Build the 7-day map
+    final weekMap = <String, PrayerTimings>{};
+    for (final d in dates) {
+      final mKey = '${d.year}-${d.month}';
+      final monthJson = monthJsons[mKey];
+      if (monthJson == null) continue;
 
-    if (kDebugMode) debugPrint('[PrayerAPI] URL: $url');
+      final dayData = CacheService.extractDay(monthJson, d.day);
+      if (dayData == null) continue;
 
-    http.Response response;
-    try {
-      response = await http.get(Uri.parse(url));
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[PrayerAPI] Request failed: url=$url error=$e');
+      try {
+        final timings = PrayerTimings.fromCalendarDay(dayData);
+
+        // Sanity check
+        if (!timings.sanityCheck()) {
+          if (kDebugMode) {
+            debugPrint('[PrayerAPI] ⚠️ sanity check failed for ${dateKey(d)}');
+          }
+          continue;
+        }
+
+        weekMap[dateKey(d)] = timings;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[PrayerAPI] parse error for ${dateKey(d)}: $e');
+        }
       }
-      final cached = await _cache.load();
-      if (cached != null) {
-        return PrayerFetchResult(
-          timings: PrayerTimings.fromApiResponse(json.decode(cached)),
-          offlineCached: true,
-        );
-      }
-      throw Exception('Could not load prayer times. Check internet and retry.');
     }
 
-    if (response.statusCode == 200) {
-      final body = json.decode(response.body);
-      final timings = body['data']?['timings'];
-      final metaTz = body['data']?['meta']?['timezone'];
-      debugPrint('[PrayerAPI] meta.timezone=$metaTz');
-      debugPrint(
-        '[PrayerAPI] Fajr=${timings?['Fajr']} Sunrise=${timings?['Sunrise']} '
-        'Dhuhr=${timings?['Dhuhr']} Asr=${timings?['Asr']} '
-        'Maghrib=${timings?['Maghrib']} Isha=${timings?['Isha']}',
-      );
-
-      // Sanity check: Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha
-      if (!_sanityCheck(timings)) {
-        debugPrint(
-          '[PrayerAPI] ⚠️ SANITY CHECK FAILED — timings not in expected order',
-        );
-        debugPrint(
-          '[PrayerAPI] meta.timezone=$metaTz lat=${loc.lat} lon=${loc.lon}',
-        );
-        throw Exception('Invalid timing data — prayer order check failed');
-      }
-
-      await _cache.save(response.body, cacheTag);
-      return PrayerFetchResult(
-        timings: PrayerTimings.fromApiResponse(body),
-        offlineCached: false,
-      );
-    } else {
-      if (kDebugMode) {
-        debugPrint(
-          '[PrayerAPI] Request failed: url=$url status=${response.statusCode}',
-        );
-      }
-      // Fallback to cache
-      final cached = await _cache.load();
-      if (cached != null) {
-        return PrayerFetchResult(
-          timings: PrayerTimings.fromApiResponse(json.decode(cached)),
-          offlineCached: true,
-        );
-      }
-      throw Exception('Could not load prayer times. Check internet and retry.');
+    if (weekMap.isEmpty) {
+      throw Exception('Could not load prayer times for any day. Check internet and retry.');
     }
+
+    return PrayerWeekResult(
+      week: weekMap,
+      offlineCached: anyNetworkFail && weekMap.isNotEmpty,
+    );
   }
 
   /// Returns true if Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha.
-  bool _sanityCheck(Map<String, dynamic>? timings) {
+  bool sanityCheck(Map<String, dynamic>? timings) {
     if (timings == null) return false;
     final order = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     int prev = -1;

@@ -1,20 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadSavedLocation } from './locationService';
+import { saveMonth, loadMonth, isMonthValid, extractDay } from './prayerCacheService';
 
-const BASE_URL = 'https://api.aladhan.com/v1/timings';
-const CACHE_KEY = 'cached_prayer_json';
-const CACHE_DATE_KEY = 'cached_prayer_date';
+const CALENDAR_URL = 'https://api.aladhan.com/v1/calendar';
 
-function formatDateDD(date) {
-    const d = date.getDate().toString().padStart(2, '0');
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const y = date.getFullYear();
-    return `${d}-${m}-${y}`;
+/**
+ * Clean timezone suffix from API time strings like "05:43 (EET)"
+ */
+export function cleanTime(raw) {
+    if (!raw) return '00:00';
+    return raw.replace(/\s*\(.*\)/, '').trim();
 }
 
 /**
  * Sanity check: Fajr < Sunrise < Dhuhr < Asr < Maghrib < Isha.
- * Returns true if order is valid.
  */
 function sanityCheck(timings) {
     if (!timings) return false;
@@ -31,87 +29,149 @@ function sanityCheck(timings) {
     return true;
 }
 
-export async function fetchPrayerTimes({ methodId, school }) {
-    // Read detected/persisted location
+/**
+ * Date key format: YYYY-MM-DD
+ */
+export function dateKey(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Parse a single day entry from the calendar API into a timings object.
+ */
+export function parseDayTimings(dayData) {
+    const timings = dayData.timings;
+    const hijri = dayData.date?.hijri;
+    const greg = dayData.date?.gregorian;
+
+    let gregFormatted = '';
+    if (greg) {
+        gregFormatted = `${greg.weekday?.en || ''}, ${greg.month?.en || ''} ${greg.day || ''}, ${greg.year || ''}`;
+    }
+
+    const hijriDay = hijri?.day || '';
+    const hijriMonthAr = hijri?.month?.ar || '';
+    const hijriYear = hijri?.year || '';
+    const hijriFormatted = hijriDay
+        ? `\u200E${hijriDay} ${hijriMonthAr} ${hijriYear} \u0647\u0640`
+        : '—';
+
+    const mainPrayers = [
+        { name: 'Fajr', time24: cleanTime(timings.Fajr) },
+        { name: 'Dhuhr', time24: cleanTime(timings.Dhuhr) },
+        { name: 'Asr', time24: cleanTime(timings.Asr) },
+        { name: 'Maghrib', time24: cleanTime(timings.Maghrib) },
+        { name: 'Isha', time24: cleanTime(timings.Isha) },
+    ];
+
+    const supplementary = [
+        { name: 'Sunrise', time24: cleanTime(timings.Sunrise) },
+        { name: 'Last Third of Night', time24: cleanTime(timings.Lastthird) },
+    ];
+
+    return { mainPrayers, supplementary, gregFormatted, hijriFormatted };
+}
+
+/**
+ * Fetch prayer times for 7 days (today..today+6).
+ * Uses the monthly calendar endpoint and caches full months.
+ */
+export async function fetchWeekPrayerTimes({ methodId, school }) {
     const loc = await loadSavedLocation();
     const lat = loc.lat;
     const lng = loc.lon;
-
     const now = new Date();
-    const dateStr = formatDateDD(now);
 
-    // Cache key includes coords so changing location forces re-fetch
-    const cacheTag = `${dateStr}_${lat.toFixed(2)}_${lng.toFixed(2)}_${methodId}_${school}`;
-
-    // Try cache first
-    try {
-        const cachedDate = await AsyncStorage.getItem(CACHE_DATE_KEY);
-        if (cachedDate === cacheTag) {
-            const cached = await AsyncStorage.getItem(CACHE_KEY);
-            if (cached) return { json: JSON.parse(cached), offlineCached: false };
-        }
-    } catch (e) {
-        // Ignore cache errors
+    // Determine which months we need (today..today+6 might span 2 months)
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
     }
 
-    // Fetch from API — NO timezonestring; let API auto-detect from lat/lon
-    const url = `${BASE_URL}/${dateStr}?latitude=${lat}&longitude=${lng}&method=${methodId}&school=${school}`;
-
-    if (__DEV__) {
-        console.log('[PrayerAPI] URL:', url);
+    const monthsNeeded = new Set();
+    for (const d of dates) {
+        monthsNeeded.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
     }
 
-    let response;
-    try {
-        response = await fetch(url);
-    } catch (e) {
-        if (__DEV__) {
-            console.log(`[PrayerAPI] Request failed: url=${url} error=${e?.message || e}`);
+    let anyNetworkFail = false;
+    const monthJsons = {};
+
+    // Fetch/load each needed month
+    for (const key of monthsNeeded) {
+        const [yearStr, monthStr] = key.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+
+        // Check cache validity
+        const valid = await isMonthValid(year, month);
+        if (valid) {
+            const cached = await loadMonth(year, month);
+            if (cached) {
+                monthJsons[key] = cached;
+                if (__DEV__) console.log(`[PRAYER_CACHE] hit month=${month} year=${year}`);
+                continue;
+            }
         }
+
+        // Fetch from API
+        const url = `${CALENDAR_URL}?latitude=${lat}&longitude=${lng}&method=${methodId}&school=${school}&month=${month}&year=${year}`;
+
+        if (__DEV__) console.log(`[PRAYER_CACHE] miss month=${month} year=${year}`);
+        if (__DEV__) console.log(`[PrayerAPI] calendar URL: ${url}`);
+
         try {
-            const cached = await AsyncStorage.getItem(CACHE_KEY);
-            if (cached) return { json: JSON.parse(cached), offlineCached: true };
-        } catch (_) {
-            // Ignore
-        }
-        throw new Error('Could not load prayer times. Check internet and retry.');
-    }
-
-    if (response.ok) {
-        const json = await response.json();
-        const timings = json.data?.timings;
-        const metaTz = json.data?.meta?.timezone;
-        if (__DEV__) {
-            console.log(`[PrayerAPI] meta.timezone=${metaTz}`);
-            console.log(`[PrayerAPI] Fajr=${timings?.Fajr} Sunrise=${timings?.Sunrise} Dhuhr=${timings?.Dhuhr} Asr=${timings?.Asr} Maghrib=${timings?.Maghrib} Isha=${timings?.Isha}`);
-        }
-
-        // Sanity check
-        if (!sanityCheck(timings)) {
-            console.warn('[PrayerAPI] ⚠️ SANITY CHECK FAILED — timings not in expected order');
-            console.warn(`[PrayerAPI] meta.timezone=${metaTz} lat=${lat} lon=${lng}`);
-            throw new Error('Invalid timing data — prayer order check failed');
-        }
-
-        // Cache it
-        try {
-            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(json));
-            await AsyncStorage.setItem(CACHE_DATE_KEY, cacheTag);
+            const response = await fetch(url);
+            if (response.ok) {
+                const text = await response.text();
+                monthJsons[key] = text;
+                await saveMonth(year, month, text);
+            } else {
+                anyNetworkFail = true;
+                if (__DEV__) console.log(`[PrayerAPI] calendar failed status=${response.status}`);
+                const stale = await loadMonth(year, month);
+                if (stale) monthJsons[key] = stale;
+            }
         } catch (e) {
-            // Ignore cache errors
+            anyNetworkFail = true;
+            if (__DEV__) console.log(`[PrayerAPI] calendar fetch error: ${e?.message || e}`);
+            const stale = await loadMonth(year, month);
+            if (stale) monthJsons[key] = stale;
         }
-        return { json, offlineCached: false };
-    } else {
-        if (__DEV__) {
-            console.log(`[PrayerAPI] Request failed: url=${url} status=${response.status}`);
-        }
-        // Fallback to cache
-        try {
-            const cached = await AsyncStorage.getItem(CACHE_KEY);
-            if (cached) return { json: JSON.parse(cached), offlineCached: true };
-        } catch (e) {
-            // Ignore
-        }
-        throw new Error('Could not load prayer times. Check internet and retry.');
     }
+
+    // Build 7-day map
+    const weekMap = {};
+    for (const d of dates) {
+        const mKey = `${d.getFullYear()}-${d.getMonth() + 1}`;
+        const monthJson = monthJsons[mKey];
+        if (!monthJson) continue;
+
+        const dayData = extractDay(monthJson, d.getDate());
+        if (!dayData) continue;
+
+        try {
+            // Sanity check raw timings
+            if (!sanityCheck(dayData.timings)) {
+                if (__DEV__) console.log(`[PrayerAPI] ⚠️ sanity check failed for ${dateKey(d)}`);
+                continue;
+            }
+            weekMap[dateKey(d)] = parseDayTimings(dayData);
+        } catch (e) {
+            if (__DEV__) console.log(`[PrayerAPI] parse error for ${dateKey(d)}: ${e?.message || e}`);
+        }
+    }
+
+    if (Object.keys(weekMap).length === 0) {
+        throw new Error('Could not load prayer times for any day. Check internet and retry.');
+    }
+
+    return {
+        week: weekMap,
+        offlineCached: anyNetworkFail && Object.keys(weekMap).length > 0,
+    };
 }

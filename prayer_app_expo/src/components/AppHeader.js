@@ -5,7 +5,7 @@ import { Spacing, SalahLayout, interFont } from '../theme/theme';
 import { useTheme } from '../providers/ThemeProvider';
 import AppIconButton from './AppIconButton';
 
-export default function AppHeader({ title, onSettingsTap }) {
+export default function AppHeader({ title, onSettingsTap, onTestNotification }) {
     const { theme: tc } = useTheme();
     return (
         <View style={styles.container}>
@@ -17,12 +17,23 @@ export default function AppHeader({ title, onSettingsTap }) {
                 />
                 <Text style={[styles.title, { color: tc.textPrimary }]}>{title}</Text>
             </View>
-            <AppIconButton
-                icon="cog-outline"
-                size={SalahLayout.gearButtonSize}
-                iconSize={SalahLayout.gearIconSize}
-                onPress={onSettingsTap || (() => { })}
-            />
+            <View style={styles.buttonRow}>
+                {onTestNotification && (
+                    <AppIconButton
+                        icon="bell-outline"
+                        size={SalahLayout.gearButtonSize}
+                        iconSize={SalahLayout.gearIconSize}
+                        onPress={onTestNotification}
+                    />
+                )}
+                {onTestNotification && <View style={{ width: 4 }} />}
+                <AppIconButton
+                    icon="cog-outline"
+                    size={SalahLayout.gearButtonSize}
+                    iconSize={SalahLayout.gearIconSize}
+                    onPress={onSettingsTap || (() => { })}
+                />
+            </View>
         </View>
     );
 }
@@ -39,8 +50,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: Spacing.s8,
     },
+    buttonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     title: {
         fontFamily: interFont('500'),
         fontSize: 16,
     },
 });
+

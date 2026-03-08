@@ -95,6 +95,13 @@ class PrayerTimings {
     );
   }
 
+  /// Parse a single day entry from the calendar API response.
+  /// Each entry in the calendar `data[]` array has the same structure
+  /// as the single-day response's `data` field.
+  factory PrayerTimings.fromCalendarDay(Map<String, dynamic> dayData) {
+    return PrayerTimings.fromApiResponse({'data': dayData});
+  }
+
   String get hijriFormatted {
     if (hijriDay.isEmpty) return '—';
     return '\u200E$hijriDay $hijriMonthAr $hijriYear هـ';

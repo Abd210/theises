@@ -29,6 +29,7 @@ export default function BottomNavBar({ activeIndex, onTap }) {
                         ]}
                         onPress={() => onTap(i)}
                         activeOpacity={0.7}
+                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     >
                         <MaterialCommunityIcons
                             name={item.icon}
@@ -76,3 +77,4 @@ const styles = StyleSheet.create({
         marginLeft: Spacing.s8,
     },
 });
+

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-    View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, TouchableOpacity,
+    View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator,
+    TouchableOpacity, FlatList, useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Spacing, SalahLayout, interFont, getPrayerIcon, getTypography } from '../theme/theme';
@@ -9,16 +10,12 @@ import AppHeader from '../components/AppHeader';
 import NextPrayerCard from '../components/NextPrayerCard';
 import PrayerRow from '../components/PrayerRow';
 import AppDivider from '../components/AppDivider';
-import { fetchPrayerTimes } from '../services/prayerApi';
+import { fetchWeekPrayerTimes, dateKey } from '../services/prayerApi';
 import { useLocation } from '../providers/LocationProvider';
 import { usePrayerSettings } from '../providers/PrayerSettingsProvider';
+import notificationService from '../services/notificationService';
 
 // ── helpers ──
-function cleanTime(raw) {
-    if (!raw) return '00:00';
-    return raw.replace(/\s*\(.*\)/, '').trim();
-}
-
 function formatTo12Hour(time24) {
     const parts = time24.split(':');
     if (parts.length < 2) return time24;
@@ -41,97 +38,73 @@ function padTwo(n) {
     return n.toString().padStart(2, '0');
 }
 
+function dayLabel(d) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = Math.round((target - today) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function applyOffsets(timingsObj, offsets) {
+    const { mainPrayers, supplementary, gregFormatted, hijriFormatted } = timingsObj;
+    const adjusted = mainPrayers.map((p) => {
+        const mins = offsets[p.name] || 0;
+        if (mins === 0) return { ...p };
+        const now2 = new Date();
+        const dt = timeToDate(p.time24, now2);
+        dt.setMinutes(dt.getMinutes() + mins);
+        return {
+            ...p,
+            time24: `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`,
+        };
+    });
+    return { mainPrayers: adjusted, supplementary, gregFormatted, hijriFormatted };
+}
+
 export default function SalahScreen({ onSettingsTap }) {
     const { theme: tc } = useTheme();
     const { location, usingDefaultLocationBanner } = useLocation();
     const { methodId, school, offsets } = usePrayerSettings();
     const typo = getTypography(tc);
-    const [timings, setTimings] = useState(null);
+    const { width: screenWidth } = useWindowDimensions();
+    const flatListRef = useRef(null);
+
+    const [weekTimings, setWeekTimings] = useState(null);
     const [error, setError] = useState(null);
     const [offlineCached, setOfflineCached] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [selectedDay, setSelectedDay] = useState(0);
     const [, setTick] = useState(0);
+
+    // 7 dates: today..today+6
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+    }
+    const dayKeys = dates.map((d) => dateKey(d));
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
         setOfflineCached(false);
         try {
-            const result = await fetchPrayerTimes({ methodId, school });
-            const json = result.json;
-            const data = json.data;
-            const t = data.timings;
-            const hijri = data.date?.hijri;
-            const greg = data.date?.gregorian;
+            const result = await fetchWeekPrayerTimes({ methodId, school });
 
-            let gregFormatted = '';
-            if (greg) {
-                gregFormatted = `${greg.weekday?.en || ''}, ${greg.month?.en || ''} ${greg.day || ''}, ${greg.year || ''}`;
+            // Apply per-prayer offsets to each day
+            const adjusted = {};
+            for (const [key, timings] of Object.entries(result.week)) {
+                adjusted[key] = applyOffsets(timings, offsets);
             }
 
-            const hijriDay = hijri?.day || '';
-            const hijriMonthAr = hijri?.month?.ar || '';
-            const hijriYear = hijri?.year || '';
-            const hijriFormatted = hijriDay
-                ? `\u200E${hijriDay} ${hijriMonthAr} ${hijriYear} \u0647\u0640`
-                : '—';
-
-            const mainPrayers = [
-                { name: 'Fajr', time24: cleanTime(t.Fajr) },
-                { name: 'Dhuhr', time24: cleanTime(t.Dhuhr) },
-                { name: 'Asr', time24: cleanTime(t.Asr) },
-                { name: 'Maghrib', time24: cleanTime(t.Maghrib) },
-                { name: 'Isha', time24: cleanTime(t.Isha) },
-            ];
-
-            // Apply per-prayer offsets
-            for (const p of mainPrayers) {
-                const mins = offsets[p.name] || 0;
-                if (mins !== 0) {
-                    const now2 = new Date();
-                    const dt = timeToDate(p.time24, now2);
-                    dt.setMinutes(dt.getMinutes() + mins);
-                    p.time24 = `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
-                }
-            }
-
-            const supplementary = [
-                { name: 'Sunrise', time24: cleanTime(t.Sunrise) },
-                { name: 'Last Third of Night', time24: cleanTime(t.Lastthird) },
-            ];
-
-            // Post-offset sanity check
-            const allOrdered = [
-                mainPrayers[0], // Fajr
-                supplementary[0], // Sunrise
-                mainPrayers[1], // Dhuhr
-                mainPrayers[2], // Asr
-                mainPrayers[3], // Maghrib
-                mainPrayers[4], // Isha
-            ];
-            let prevMins = -1;
-            let orderValid = true;
-            for (const p of allOrdered) {
-                const parts = p.time24.split(':');
-                const m = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
-                if (m <= prevMins) { orderValid = false; break; }
-                prevMins = m;
-            }
-            if (!orderValid) {
-                console.warn('[SalahScreen] ⚠️ Post-offset sanity check failed');
-                console.warn('[SalahScreen] Adjusted times:', mainPrayers.map(p => `${p.name}=${p.time24}`).join(' '));
-                setError('Timing data invalid after offsets. Using previous data.');
-                setLoading(false);
-                return;
-            }
-
+            setWeekTimings(adjusted);
             setOfflineCached(!!result.offlineCached);
-            setTimings({
-                mainPrayers,
-                supplementary,
-                gregFormatted,
-                hijriFormatted,
-            });
         } catch (e) {
             setError('Could not load prayer times. Check internet and retry.');
         } finally {
@@ -149,7 +122,15 @@ export default function SalahScreen({ onSettingsTap }) {
         return () => clearInterval(id);
     }, []);
 
-    if (loading && !timings) {
+    const onViewableItemsChanged = useRef(({ viewableItems }) => {
+        if (viewableItems?.length > 0) {
+            setSelectedDay(viewableItems[0].index);
+        }
+    }).current;
+
+    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
+    if (loading && !weekTimings) {
         return (
             <View style={styles.center}>
                 <ActivityIndicator color={tc.accent} size="large" />
@@ -157,7 +138,7 @@ export default function SalahScreen({ onSettingsTap }) {
         );
     }
 
-    if (!timings) {
+    if (!weekTimings || Object.keys(weekTimings).length === 0) {
         return (
             <View style={styles.center}>
                 <Text style={[typo.caption, { textAlign: 'center', paddingHorizontal: 24 }]}>
@@ -171,45 +152,191 @@ export default function SalahScreen({ onSettingsTap }) {
         );
     }
 
-    // Next prayer
-    const now = new Date();
-    let nextPrayer = null;
-    for (const p of timings.mainPrayers) {
-        if (timeToDate(p.time24, now) > now) {
-            nextPrayer = p;
-            break;
-        }
-    }
-    if (!nextPrayer) nextPrayer = timings.mainPrayers[0];
+    const renderFixedDateAndHero = () => {
+        if (!weekTimings || !dates[selectedDay]) return null;
+        const key = dayKeys[selectedDay];
+        const t = weekTimings[key];
+        const isToday = selectedDay === 0;
+        const now = new Date();
 
-    // Countdown
-    let target = timeToDate(nextPrayer.time24, now);
-    if (target <= now) {
-        target = new Date(target.getTime() + 86400000);
-    }
-    const diff = Math.max(0, target - now);
-    const hours = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    const countdown = `${padTwo(hours)}:${padTwo(mins)}:${padTwo(secs)}`;
+        if (!t) return null;
+
+        // Next prayer
+        let nextPrayer = null;
+        if (isToday) {
+            for (const p of t.mainPrayers) {
+                if (timeToDate(p.time24, now) > now) {
+                    nextPrayer = p;
+                    break;
+                }
+            }
+            if (!nextPrayer) nextPrayer = t.mainPrayers[0];
+        } else {
+            nextPrayer = t.mainPrayers[0];
+        }
+
+        // Countdown (today only)
+        let countdown = '—';
+        if (isToday) {
+            let target = timeToDate(nextPrayer.time24, now);
+            if (target <= now) target = new Date(target.getTime() + 86400000);
+            const diff = Math.max(0, target - now);
+            const hours = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            countdown = `${padTwo(hours)}:${padTwo(mins)}:${padTwo(secs)}`;
+        }
+
+        return (
+            <View>
+                {/* Date row */}
+                <View style={{ height: SalahLayout.dateRowMarginTop }} />
+                <View style={styles.dateRow}>
+                    <Text style={typo.caption}>{t.gregFormatted}</Text>
+                    <Text style={[styles.hijriText, { color: tc.accent }]}>{t.hijriFormatted}</Text>
+                </View>
+                <View style={{ height: SalahLayout.dateRowMarginBottom }} />
+
+                {/* Hero card */}
+                <View style={styles.padH}>
+                    <NextPrayerCard
+                        name={nextPrayer.name}
+                        countdown={countdown}
+                        adhanTime={formatTo12Hour(nextPrayer.time24)}
+                    />
+                </View>
+                <View style={{ height: SalahLayout.heroMarginBottom }} />
+            </View>
+        );
+    };
+
+    const renderDayPage = ({ item: dayIndex }) => {
+        const date = dates[dayIndex];
+        const key = dayKeys[dayIndex];
+        const t = weekTimings[key];
+        const isToday = dayIndex === 0;
+        const now = new Date();
+
+        if (!t) {
+            return (
+                <View style={[styles.center, { width: screenWidth }]}>
+                    <Text style={typo.caption}>No data for {dayLabel(date)}</Text>
+                </View>
+            );
+        }
+
+        // Next prayer
+        let nextPrayer = null;
+        if (isToday) {
+            for (const p of t.mainPrayers) {
+                if (timeToDate(p.time24, now) > now) {
+                    nextPrayer = p;
+                    break;
+                }
+            }
+            if (!nextPrayer) nextPrayer = t.mainPrayers[0];
+        } else {
+            nextPrayer = t.mainPrayers[0];
+        }
+
+        return (
+            <ScrollView
+                style={{ width: screenWidth }}
+                contentContainerStyle={styles.scrollContent}
+            >
+
+                {/* Schedule label */}
+                <View style={[styles.row, styles.padH]}>
+                    <MaterialCommunityIcons
+                        name="calendar-month"
+                        size={SalahLayout.scheduleIconSize}
+                        color={tc.textMuted}
+                    />
+                    <Text style={[typo.caption, { marginLeft: Spacing.s8 }]}>
+                        {t.gregFormatted}
+                    </Text>
+                </View>
+                <View style={{ height: SalahLayout.scheduleMarginBottom }} />
+
+                {/* Main prayers */}
+                {t.mainPrayers.map((p) => (
+                    <View key={p.name} style={styles.padH}>
+                        <PrayerRow
+                            name={p.name}
+                            time={formatTo12Hour(p.time24)}
+                            isHighlighted={isToday && p.name === nextPrayer.name}
+                        />
+                        <View style={{ height: SalahLayout.rowSpacing }} />
+                    </View>
+                ))}
+
+                {/* Divider */}
+                <View style={styles.padH}>
+                    <View style={{ height: SalahLayout.dividerMarginTop }} />
+                    <AppDivider />
+                    <View style={{ height: SalahLayout.dividerMarginTop }} />
+                </View>
+
+                {/* Supplementary */}
+                {t.supplementary.map((p) => (
+                    <View key={p.name} style={styles.padH}>
+                        <PrayerRow
+                            name={p.name}
+                            time={formatTo12Hour(p.time24)}
+                        />
+                        <View style={{ height: SalahLayout.rowSpacing }} />
+                    </View>
+                ))}
+
+                {/* Day dots */}
+                <View style={styles.dotsRow}>
+                    {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                        <TouchableOpacity
+                            key={i}
+                            onPress={() => {
+                                flatListRef.current?.scrollToIndex({ index: i, animated: true });
+                            }}
+                        >
+                            <View
+                                style={[
+                                    styles.dot,
+                                    {
+                                        width: i === selectedDay ? 24 : 8,
+                                        backgroundColor: i === selectedDay ? tc.accent : `${tc.textMuted}4D`,
+                                    },
+                                ]}
+                            />
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Day label */}
+                <Text style={[typo.body, {
+                    fontFamily: interFont('600'),
+                    fontSize: 14,
+                    textAlign: 'center',
+                }]}>
+                    {dayLabel(dates[dayIndex])}
+                </Text>
+
+                <View style={{ height: SalahLayout.screenPadding }} />
+            </ScrollView>
+        );
+    };
+
+    const dayIndices = [0, 1, 2, 3, 4, 5, 6];
 
     return (
-        <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={
-                <RefreshControl
-                    refreshing={loading}
-                    onRefresh={load}
-                    tintColor={tc.accent}
-                />
-            }
-        >
+        <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={{ height: SalahLayout.headerMarginTop }} />
             <AppHeader
                 title={location ? (location.country ? `${location.city}, ${location.country}` : location.city) : 'Bucharest'}
                 onSettingsTap={onSettingsTap}
+                onTestNotification={async () => {
+                    const granted = await notificationService.requestPermission();
+                    if (granted) await notificationService.sendTestNow();
+                }}
             />
             <View style={{ height: SalahLayout.headerMarginBottom }} />
 
@@ -236,77 +363,44 @@ export default function SalahScreen({ onSettingsTap }) {
                 </View>
             )}
 
-            {/* Date row */}
-            <View style={{ height: SalahLayout.dateRowMarginTop }} />
-            <View style={styles.dateRow}>
-                <Text style={typo.caption}>{timings.gregFormatted}</Text>
-                <Text style={[styles.hijriText, { color: tc.accent }]}>{timings.hijriFormatted}</Text>
-            </View>
-            <View style={{ height: SalahLayout.dateRowMarginBottom }} />
+            {/* Fixed Date & Hero */}
+            {renderFixedDateAndHero()}
 
-            {/* Hero card */}
-            <View style={styles.padH}>
-                <NextPrayerCard
-                    name={nextPrayer.name}
-                    countdown={countdown}
-                    adhanTime={formatTo12Hour(nextPrayer.time24)}
-                />
-            </View>
-            <View style={{ height: SalahLayout.heroMarginBottom }} />
-
-            {/* Schedule label */}
-            <View style={[styles.row, styles.padH]}>
-                <MaterialCommunityIcons
-                    name="calendar-month"
-                    size={SalahLayout.scheduleIconSize}
-                    color={tc.textMuted}
-                />
-                <Text style={[typo.caption, { marginLeft: Spacing.s8 }]}>
-                    {timings.gregFormatted}
-                </Text>
-            </View>
-            <View style={{ height: SalahLayout.scheduleMarginBottom }} />
-
-            {/* Main prayers */}
-            {timings.mainPrayers.map((p) => (
-                <View key={p.name} style={styles.padH}>
-                    <PrayerRow
-                        name={p.name}
-                        time={formatTo12Hour(p.time24)}
-                        isHighlighted={p.name === nextPrayer.name}
+            {/* Day pager */}
+            <FlatList
+                ref={flatListRef}
+                data={dayIndices}
+                keyExtractor={(item) => `day-${item}`}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                initialScrollIndex={0}
+                getItemLayout={(_, index) => ({
+                    length: screenWidth,
+                    offset: screenWidth * index,
+                    index,
+                })}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                renderItem={renderDayPage}
+                onScrollToIndexFailed={() => {}}
+                removeClippedSubviews
+                refreshControl={
+                    <RefreshControl
+                        refreshing={loading}
+                        onRefresh={load}
+                        tintColor={tc.accent}
                     />
-                    <View style={{ height: SalahLayout.rowSpacing }} />
-                </View>
-            ))}
-
-            {/* Divider */}
-            <View style={styles.padH}>
-                <View style={{ height: SalahLayout.dividerMarginTop }} />
-                <AppDivider />
-                <View style={{ height: SalahLayout.dividerMarginTop }} />
-            </View>
-
-            {/* Supplementary */}
-            {timings.supplementary.map((p) => (
-                <View key={p.name} style={styles.padH}>
-                    <PrayerRow
-                        name={p.name}
-                        time={formatTo12Hour(p.time24)}
-                    />
-                    <View style={{ height: SalahLayout.rowSpacing }} />
-                </View>
-            ))}
-
-            <View style={{ height: SalahLayout.screenPadding }} />
-        </ScrollView>
+                }
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    scroll: { flex: 1 },
-    scrollContent: { flexGrow: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     padH: { paddingHorizontal: SalahLayout.screenPadding },
+    scrollContent: { flexGrow: 1 },
     dateRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -339,5 +433,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 18,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: SalahLayout.screenPadding,
+        paddingVertical: Spacing.s8,
+    },
+    dot: {
+        height: 8,
+        borderRadius: 4,
+        marginHorizontal: 3,
     },
 });

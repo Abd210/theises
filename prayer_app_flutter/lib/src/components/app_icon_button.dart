@@ -19,17 +19,24 @@ class AppIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeScope.of(context).current;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: tc.iconButtonBg,
-          borderRadius: BorderRadius.circular(AppRadius.button),
-          border: Border.all(color: tc.cardBorder, width: 1),
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Center(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: tc.iconButtonBg,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(color: tc.cardBorder, width: 1),
+            ),
+            child: Icon(icon, color: tc.textPrimary, size: iconSize),
+          ),
         ),
-        child: Icon(icon, color: tc.textPrimary, size: iconSize),
       ),
     );
   }

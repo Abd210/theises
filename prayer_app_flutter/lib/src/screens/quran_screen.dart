@@ -6,8 +6,8 @@ import '../services/quran_storage_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import 'quran_surah_list_screen.dart';
-import 'quran_reader_screen.dart';
 import 'quran_bookmarks_screen.dart';
+import 'mushaf_pager_screen.dart';
 
 class QuranScreen extends StatefulWidget {
   const QuranScreen({super.key});
@@ -93,15 +93,10 @@ class _QuranScreenState extends State<QuranScreen> {
     return null;
   }
 
-  Future<void> _openReader(QuranPointer pointer) async {
-    final surah = _findSurah(pointer.surahNumber);
-    if (surah == null) return;
+  Future<void> _openMushaf(int page) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => QuranReaderScreen(
-          surah: surah,
-          initialAyahNumber: pointer.ayahNumber,
-        ),
+        builder: (_) => MushafPagerScreen(initialPage: page),
       ),
     );
     _loadPersisted();
@@ -123,8 +118,8 @@ class _QuranScreenState extends State<QuranScreen> {
     });
 
     try {
-      final pointer = await _api.getJuzStartPointer(juz);
-      if (pointer == null) {
+      final pointer = await _api.getJuzStartPage(juz);
+      if (pointer == null || pointer.pageNumber == null) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -133,33 +128,8 @@ class _QuranScreenState extends State<QuranScreen> {
         return;
       }
 
-      SurahMeta? surah = _findSurah(pointer.surahNumber);
-      if (surah == null) {
-        final refreshed = await _api.fetchSurahList();
-        if (mounted) {
-          setState(() => _surahs = refreshed);
-        }
-        surah = _findSurah(pointer.surahNumber);
-      }
-      if (surah == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Surah metadata missing for Juz $juz')),
-          );
-        }
-        return;
-      }
-
       if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => QuranReaderScreen(
-            surah: surah!,
-            initialAyahNumber: pointer.ayahNumber,
-          ),
-        ),
-      );
-      _loadPersisted();
+      await _openMushaf(pointer.pageNumber!);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -314,16 +284,21 @@ class _QuranScreenState extends State<QuranScreen> {
         // Continue
         _sectionTitle('Continue Reading', tc),
         const SizedBox(height: 8),
-        if (_lastRead != null)
+        if (_lastRead != null && _lastRead!.pageNumber != null)
+          _ActionCard(
+            text: 'Continue: Page ${_lastRead!.pageNumber}',
+            onTap: () => _openMushaf(_lastRead!.pageNumber!),
+          )
+        else if (_lastRead != null)
           _ActionCard(
             text:
                 'Continue: ${_findSurah(_lastRead!.surahNumber)?.englishName ?? 'Surah ${_lastRead!.surahNumber}'} · Ayah ${_lastRead!.ayahNumber}',
-            onTap: () => _openReader(_lastRead!),
+            onTap: () => _openMushaf(1),
           )
         else
-          _HintCard(
-            text: 'Start reading to continue here.',
-            onTap: () => _openSurahList(),
+          _ActionCard(
+            text: 'Read Quran',
+            onTap: () => _openMushaf(1),
           ),
 
         const SizedBox(height: QuranLayout.sectionGap),
@@ -350,9 +325,10 @@ class _QuranScreenState extends State<QuranScreen> {
               (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _ActionCard(
-                  text:
-                      '${_findSurah(r.surahNumber)?.englishName ?? 'Surah ${r.surahNumber}'} · Ayah ${r.ayahNumber}',
-                  onTap: () => _openReader(r),
+                  text: r.pageNumber != null
+                      ? 'Page ${r.pageNumber}'
+                      : '${_findSurah(r.surahNumber)?.englishName ?? 'Surah ${r.surahNumber}'} · Ayah ${r.ayahNumber}',
+                  onTap: () => _openMushaf(r.pageNumber ?? 1),
                   compact: true,
                 ),
               ),
@@ -444,29 +420,6 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _HintCard extends StatelessWidget {
-  final String text;
-  final VoidCallback onTap;
-
-  const _HintCard({required this.text, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final tc = ThemeScope.of(context).current;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: tc.card,
-          borderRadius: BorderRadius.circular(QuranLayout.cardRadius),
-          border: Border.all(color: tc.cardBorder),
-        ),
-        child: Text(text, style: AppTypography.caption(tc)),
-      ),
-    );
-  }
-}
 
 class _JuzChip extends StatelessWidget {
   final int number;

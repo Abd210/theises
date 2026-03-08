@@ -175,11 +175,11 @@ export default function QuranReaderScreen({ surah, initialAyahNumber = 1, onBack
                     <Text style={[typo.body, { fontFamily: interFont('600') }]} numberOfLines={1}>{surah.englishName}</Text>
                     <Text style={[typo.caption]} numberOfLines={1}>{surah.nameAr} · Ayah {currentAyah}</Text>
                 </View>
-                <TouchableOpacity onPress={() => setFontScale((s) => Math.max(0.8, +(s - 0.1).toFixed(1)))}>
+                <TouchableOpacity onPress={() => setFontScale((s) => Math.max(0.8, +(s - 0.1).toFixed(1)))} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <MaterialCommunityIcons name="format-font-size-decrease" size={QuranLayout.topActionIconSize} color={tc.textPrimary} />
                 </TouchableOpacity>
                 <View style={{ width: 8 }} />
-                <TouchableOpacity onPress={() => setFontScale((s) => Math.min(1.6, +(s + 0.1).toFixed(1)))}>
+                <TouchableOpacity onPress={() => setFontScale((s) => Math.min(1.6, +(s + 0.1).toFixed(1)))} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <MaterialCommunityIcons name="format-font-size-increase" size={QuranLayout.topActionIconSize} color={tc.textPrimary} />
                 </TouchableOpacity>
                 <View style={{ width: 8 }} />
@@ -189,6 +189,7 @@ export default function QuranReaderScreen({ surah, initialAyahNumber = 1, onBack
                         setShowTranslation(next);
                         if (next && !english) loadTranslation();
                     }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     {translationLoading ? (
                         <ActivityIndicator size="small" color={tc.accent} />
@@ -201,7 +202,7 @@ export default function QuranReaderScreen({ surah, initialAyahNumber = 1, onBack
                     )}
                 </TouchableOpacity>
                 <View style={{ width: 8 }} />
-                <TouchableOpacity onPress={onToggleBookmark}>
+                <TouchableOpacity onPress={onToggleBookmark} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <MaterialCommunityIcons
                         name={currentBookmarked ? 'bookmark' : 'bookmark-outline'}
                         size={QuranLayout.topActionIconSize}

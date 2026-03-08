@@ -92,23 +92,85 @@ class JuzAyah {
       };
 }
 
+class PageAyah {
+  final int globalNumber;
+  final int surahNumber;
+  final String surahNameAr;
+  final String surahEnglishName;
+  final int numberInSurah;
+  final String textAr;
+  final String? textEn;
+  final int juz;
+  final int page;
+
+  const PageAyah({
+    required this.globalNumber,
+    required this.surahNumber,
+    required this.surahNameAr,
+    required this.surahEnglishName,
+    required this.numberInSurah,
+    required this.textAr,
+    this.textEn,
+    required this.juz,
+    required this.page,
+  });
+
+  PageAyah copyWith({String? textEn}) {
+    return PageAyah(
+      globalNumber: globalNumber,
+      surahNumber: surahNumber,
+      surahNameAr: surahNameAr,
+      surahEnglishName: surahEnglishName,
+      numberInSurah: numberInSurah,
+      textAr: textAr,
+      textEn: textEn ?? this.textEn,
+      juz: juz,
+      page: page,
+    );
+  }
+
+  factory PageAyah.fromApi(Map<String, dynamic> a, {bool english = false}) {
+    final surah = a['surah'] as Map<String, dynamic>? ?? const {};
+    return PageAyah(
+      globalNumber: a['number'] as int? ?? 0,
+      surahNumber: surah['number'] as int? ?? 0,
+      surahNameAr: (surah['name'] as String?) ?? '',
+      surahEnglishName: (surah['englishName'] as String?) ?? '',
+      numberInSurah: a['numberInSurah'] as int? ?? 0,
+      textAr: english ? '' : ((a['text'] as String?) ?? ''),
+      textEn: english ? (a['text'] as String?) : null,
+      juz: a['juz'] as int? ?? 1,
+      page: a['page'] as int? ?? 1,
+    );
+  }
+}
+
 class QuranPointer {
   final int surahNumber;
   final int ayahNumber;
+  final int? pageNumber;
 
-  const QuranPointer({required this.surahNumber, required this.ayahNumber});
+  const QuranPointer({
+    required this.surahNumber,
+    required this.ayahNumber,
+    this.pageNumber,
+  });
 
   factory QuranPointer.fromJson(Map<String, dynamic> json) {
     return QuranPointer(
       surahNumber: json['surahNumber'] as int? ?? 1,
       ayahNumber: json['ayahNumber'] as int? ?? 1,
+      pageNumber: json['pageNumber'] as int?,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'surahNumber': surahNumber,
         'ayahNumber': ayahNumber,
+        if (pageNumber != null) 'pageNumber': pageNumber,
       };
 
-  String dedupeKey() => '${surahNumber}_$ayahNumber';
+  String dedupeKey() => pageNumber != null
+      ? 'page_$pageNumber'
+      : '${surahNumber}_$ayahNumber';
 }

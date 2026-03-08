@@ -17,16 +17,8 @@ const CARD_MAX_W = SCREEN_W - AzkarLayout.screenPadding * 2;
 // ════════════════════════════════════════════════════════════
 // AzkarCardsPager — horizontal paging FlatList (Cards mode)
 // ════════════════════════════════════════════════════════════
-function AzkarCardsPager({ items, counters, increment, reset, currentIndex, onPageChange, tc, bottomInset }) {
+function AzkarCardsPager({ items, counters, increment, reset, currentIndex, initialIndex, onPageChange, tc, bottomInset }) {
     const flatListRef = useRef(null);
-
-    useEffect(() => {
-        if (currentIndex > 0) {
-            setTimeout(() => {
-                flatListRef.current?.scrollToIndex({ index: currentIndex, animated: false });
-            }, 50);
-        }
-    }, []);
 
     const renderCard = useCallback(({ item, index }) => {
         const count = counters[index];
@@ -70,6 +62,7 @@ function AzkarCardsPager({ items, counters, increment, reset, currentIndex, onPa
                     <View style={[styles.counterRow, { borderTopColor: tc.cardBorder }]}>
                         <TouchableOpacity
                             onPress={() => reset(index)}
+                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                             style={[styles.resetBtn, {
                                 backgroundColor: tc.card,
                                 borderColor: tc.cardBorder,
@@ -105,11 +98,17 @@ function AzkarCardsPager({ items, counters, increment, reset, currentIndex, onPa
             showsHorizontalScrollIndicator={false}
             keyExtractor={(_, i) => `card-${i}`}
             renderItem={renderCard}
+            initialScrollIndex={initialIndex || 0}
             getItemLayout={(_, index) => ({
                 length: CARD_WIDTH,
                 offset: CARD_WIDTH * index,
                 index,
             })}
+            onScrollToIndexFailed={(info) => {
+                setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                }, 100);
+            }}
             onMomentumScrollEnd={(e) => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
                 onPageChange(idx);
@@ -182,11 +181,14 @@ export default function AzkarDetailScreen({ category, onBack }) {
 
     const [viewMode, setViewMode] = useState(0);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [initialIndex, setInitialIndex] = useState(0);
     const [counters, setCounters] = useState(() => items.map(() => 0));
+    const [progressLoaded, setProgressLoaded] = useState(false);
     const currentIndexRef = useRef(0);
 
     useEffect(() => {
         console.log(`[AzkarData] categoryKey=${category.id}, itemCount=${items.length}`);
+        AsyncStorage.setItem('azkar_last_category', category.id).catch(() => {});
     }, [category.id, items.length]);
 
     useEffect(() => {
@@ -208,9 +210,16 @@ export default function AzkarDetailScreen({ category, onBack }) {
                         const idx = Math.min(data.lastIndex, items.length - 1);
                         currentIndexRef.current = idx;
                         setCurrentIndex(idx);
+                        setInitialIndex(idx);
+                        console.log(`[AZKAR_RESUME] categoryKey=${category.id} savedLastIndex=${idx} itemsLen=${items.length}`);
+                    } else {
+                        console.log(`[AZKAR_RESUME] categoryKey=${category.id} savedLastIndex=null itemsLen=${items.length}`);
                     }
+                } else {
+                    console.log(`[AZKAR_RESUME] categoryKey=${category.id} savedLastIndex=null itemsLen=${items.length}`);
                 }
             } catch (_) { /* skip */ }
+            setProgressLoaded(true);
         })();
     }, []);
 
@@ -304,13 +313,18 @@ export default function AzkarDetailScreen({ category, onBack }) {
             </View>
 
             {/* Content */}
-            {viewMode === 0 ? (
+            {!progressLoaded ? (
+                <View style={styles.center}>
+                    <Text style={[typo.caption, { color: tc.textMuted }]}>Loading...</Text>
+                </View>
+            ) : viewMode === 0 ? (
                 <AzkarCardsPager
                     items={items}
                     counters={counters}
                     increment={increment}
                     reset={reset}
                     currentIndex={currentIndex}
+                    initialIndex={initialIndex}
                     onPageChange={handlePageChange}
                     tc={tc}
                     bottomInset={insets.bottom}
@@ -331,6 +345,7 @@ export default function AzkarDetailScreen({ category, onBack }) {
 // ════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     topBar: {
         flexDirection: 'row',
         alignItems: 'center',

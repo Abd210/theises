@@ -5,7 +5,10 @@ import {
     toJuzAyahArabic,
     toJuzAyahEnglish,
     toSurahMeta,
+    toPageAyah,
+    toPageAyahEnglish,
     mergeArabicAndEnglish,
+    mergePageArabicAndEnglish,
 } from '../models/quranModels';
 
 const BASE = 'https://api.alquran.cloud/v1';
@@ -132,4 +135,32 @@ export async function getJuzStartPointer(juzNumber) {
     };
 }
 
-export { mergeArabicAndEnglish };
+export async function getJuzStartPage(juzNumber) {
+    const json = await fetchJson(`${BASE}/juz/${juzNumber}/${ARABIC_EDITION}`);
+    const ayahs = json?.data?.ayahs;
+    if (!ayahs?.length) return null;
+    const first = ayahs[0];
+    const page = first?.page ?? 1;
+    const surahNum = first?.surah?.number ?? 1;
+    const ayahNum = first?.numberInSurah ?? 1;
+    if (__DEV__) {
+        console.log(`[JUZ] juz=${juzNumber} -> startPage=${page} -> firstAyah surah:${surahNum} ayah:${ayahNum}`);
+    }
+    return {
+        surahNumber: surahNum,
+        ayahNumber: ayahNum,
+        pageNumber: page,
+    };
+}
+
+export async function fetchPageArabic(pageNumber) {
+    const json = await fetchJson(`${BASE}/page/${pageNumber}/${ARABIC_EDITION}`);
+    return (json?.data?.ayahs || []).map(toPageAyah);
+}
+
+export async function fetchPageTranslation(pageNumber) {
+    const json = await fetchJson(`${BASE}/page/${pageNumber}/${ENGLISH_EDITION}`);
+    return (json?.data?.ayahs || []).map(toPageAyahEnglish);
+}
+
+export { mergeArabicAndEnglish, mergePageArabicAndEnglish };

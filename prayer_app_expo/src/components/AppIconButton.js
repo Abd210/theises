@@ -19,6 +19,7 @@ export default function AppIconButton({ icon, onPress, size, iconSize }) {
             }]}
             onPress={onPress}
             activeOpacity={0.7}
+            hitSlop={{ top: (44 - btnSize) / 2, bottom: (44 - btnSize) / 2, left: (44 - btnSize) / 2, right: (44 - btnSize) / 2 }}
         >
             <MaterialCommunityIcons
                 name={icon}

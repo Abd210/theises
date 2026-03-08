@@ -29,6 +29,12 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
       '[AzkarData] categoryKey=${widget.category.id}, itemCount=${widget.category.items.length}',
     );
     _loadProgress();
+    _saveLastCategory();
+  }
+
+  Future<void> _saveLastCategory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('azkar_last_category', widget.category.id);
   }
 
   @override
@@ -318,17 +324,24 @@ class _AzkarDetailScreenState extends State<AzkarDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Reset
-                  GestureDetector(
-                    onTap: () => _reset(index),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: tc.card,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: tc.cardBorder),
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _reset(index),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: tc.card,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: tc.cardBorder),
+                          ),
+                          child: Icon(Icons.refresh, size: 18, color: tc.textMuted),
+                        ),
                       ),
-                      child: Icon(Icons.refresh, size: 18, color: tc.textMuted),
                     ),
                   ),
                   const SizedBox(width: 20),
