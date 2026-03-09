@@ -27,6 +27,7 @@ export function LocationProvider({ children }) {
         (async () => {
             const saved = await loadSavedLocation();
             setLocation(saved);
+            if (__DEV__) console.log(`[LOC] loadSaved: source=${saved.source} city=${saved.city} lat=${saved.lat} lon=${saved.lon}`);
 
             const isFirstRunDone = await isFirstRunCompleted();
             setFirstRunCompleted(isFirstRunDone);
@@ -55,6 +56,7 @@ export function LocationProvider({ children }) {
         try {
             const loc = await detectLocation();
             setLocation(loc);
+            if (__DEV__) console.log(`[LOC] detect: source=${loc.source} city=${loc.city} lat=${loc.lat} lon=${loc.lon}`);
             // Invalidate prayer cache so it refetches with new coords
             await AsyncStorage.removeItem('cached_prayer_date');
             return loc;
@@ -69,7 +71,7 @@ export function LocationProvider({ children }) {
                 location,
                 detecting,
                 detect,
-                usingDefaultLocationBanner: firstRunCompleted && location?.source === 'default',
+                usingDefaultLocationBanner: location?.source === 'default',
             }}
         >
             {children}

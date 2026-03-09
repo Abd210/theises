@@ -44,8 +44,11 @@ class LocationService {
   Future<LocationData> loadSaved() async {
     final prefs = await SharedPreferences.getInstance();
     final source = prefs.getString(_kSource);
-    if (source == null) return LocationData.fallback;
-    return LocationData(
+    if (source == null) {
+      debugPrint('[LOC] loadSaved: no saved source, returning fallback');
+      return LocationData.fallback;
+    }
+    final data = LocationData(
       lat: prefs.getDouble(_kLat) ?? LocationData.fallback.lat,
       lon: prefs.getDouble(_kLon) ?? LocationData.fallback.lon,
       city: prefs.getString(_kCity) ?? 'Unknown',
@@ -53,6 +56,8 @@ class LocationService {
       timezone: prefs.getString(_kTz) ?? LocationData.fallback.timezone,
       source: source,
     );
+    debugPrint('[LOC] loadSaved: source=${data.source} city=${data.city} lat=${data.lat} lon=${data.lon}');
+    return data;
   }
 
   /// Request permission, get coords, reverse geocode, persist.
@@ -119,6 +124,7 @@ class LocationService {
     );
 
     await _persist(data);
+    debugPrint('[LOC] detect: source=gps city=${data.city} lat=${data.lat} lon=${data.lon}');
     return data;
   }
 
@@ -193,8 +199,7 @@ class LocationNotifier extends ChangeNotifier {
   LocationData _data = LocationData.fallback;
   bool _firstRunCompleted = false;
   LocationData get data => _data;
-  bool get showDefaultLocationBanner =>
-      _firstRunCompleted && _data.source == 'default';
+  bool get showDefaultLocationBanner => _data.source == 'default';
 
   Future<void> load() async {
     _data = await _svc.loadSaved();

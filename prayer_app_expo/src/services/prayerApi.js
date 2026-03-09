@@ -1,5 +1,5 @@
-import { loadSavedLocation } from './locationService';
-import { saveMonth, loadMonth, isMonthValid, extractDay } from './prayerCacheService';
+import { FALLBACK_LOCATION } from './locationService';
+import { saveMonth, loadMonth, isMonthValid, extractDay, configPrefix } from './prayerCacheService';
 
 const CALENDAR_URL = 'https://api.aladhan.com/v1/calendar';
 
@@ -79,10 +79,12 @@ export function parseDayTimings(dayData) {
  * Fetch prayer times for 7 days (today..today+6).
  * Uses the monthly calendar endpoint and caches full months.
  */
-export async function fetchWeekPrayerTimes({ methodId, school }) {
-    const loc = await loadSavedLocation();
+export async function fetchWeekPrayerTimes({ loc, methodId, school }) {
+    if (!loc) loc = FALLBACK_LOCATION;
     const lat = loc.lat;
     const lng = loc.lon;
+    const cfgPrefix = configPrefix(lat, lng, methodId, school);
+    if (__DEV__) console.log(`[LOC] API using source=${loc.source} city=${loc.city} lat=${lat} lon=${lng} cfg=${cfgPrefix}`);
     const now = new Date();
 
     // Determine which months we need (today..today+6 might span 2 months)
@@ -108,12 +110,12 @@ export async function fetchWeekPrayerTimes({ methodId, school }) {
         const month = parseInt(monthStr, 10);
 
         // Check cache validity
-        const valid = await isMonthValid(year, month);
+        const valid = await isMonthValid(year, month, cfgPrefix);
         if (valid) {
-            const cached = await loadMonth(year, month);
+            const cached = await loadMonth(year, month, cfgPrefix);
             if (cached) {
                 monthJsons[key] = cached;
-                if (__DEV__) console.log(`[PRAYER_CACHE] hit month=${month} year=${year}`);
+                if (__DEV__) console.log(`[PRAYER_CACHE] hit month=${month} year=${year} cfg=${cfgPrefix}`);
                 continue;
             }
         }
@@ -121,25 +123,25 @@ export async function fetchWeekPrayerTimes({ methodId, school }) {
         // Fetch from API
         const url = `${CALENDAR_URL}?latitude=${lat}&longitude=${lng}&method=${methodId}&school=${school}&month=${month}&year=${year}`;
 
-        if (__DEV__) console.log(`[PRAYER_CACHE] miss month=${month} year=${year}`);
-        if (__DEV__) console.log(`[PrayerAPI] calendar URL: ${url}`);
+        if (__DEV__) console.log(`[PRAYER_CACHE] miss month=${month} year=${year} cfg=${cfgPrefix}`);
+        if (__DEV__) console.log(`[PRAYER] request lat=${lat} lon=${lng} method=${methodId} school=${school} month=${month} year=${year}`);
 
         try {
             const response = await fetch(url);
             if (response.ok) {
                 const text = await response.text();
                 monthJsons[key] = text;
-                await saveMonth(year, month, text);
+                await saveMonth(year, month, text, cfgPrefix);
             } else {
                 anyNetworkFail = true;
                 if (__DEV__) console.log(`[PrayerAPI] calendar failed status=${response.status}`);
-                const stale = await loadMonth(year, month);
+                const stale = await loadMonth(year, month, cfgPrefix);
                 if (stale) monthJsons[key] = stale;
             }
         } catch (e) {
             anyNetworkFail = true;
             if (__DEV__) console.log(`[PrayerAPI] calendar fetch error: ${e?.message || e}`);
-            const stale = await loadMonth(year, month);
+            const stale = await loadMonth(year, month, cfgPrefix);
             if (stale) monthJsons[key] = stale;
         }
     }

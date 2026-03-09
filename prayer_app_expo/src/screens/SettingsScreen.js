@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal, Dimensions, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal, Dimensions, Switch, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Spacing, SalahLayout, interFont, getTypography } from '../theme/theme';
@@ -383,7 +383,11 @@ function NotificationSection({ tc, typo }) {
                                 if (!granted) return;
                             }
                             await ns.setEnabled(on);
-                            if (!on) await notificationService.cancelAll();
+                            if (on) {
+                                await notificationService.scheduleFromCache('master_toggle_on');
+                            } else {
+                                await notificationService.cancelPrayerNotifications();
+                            }
                         }}
                     />
                 </View>
@@ -400,7 +404,10 @@ function NotificationSection({ tc, typo }) {
                                 <Switch
                                     value={ns.prayerEnabled[prayer] !== false}
                                     trackColor={{ true: tc.accent }}
-                                    onValueChange={(on) => ns.setPrayerEnabled(prayer, on)}
+                                    onValueChange={async (on) => {
+                                        await ns.setPrayerEnabled(prayer, on);
+                                        await notificationService.scheduleFromCache('prayer_toggle_' + prayer);
+                                    }}
                                 />
                             </View>
                         ))}
@@ -417,7 +424,10 @@ function NotificationSection({ tc, typo }) {
                                 return (
                                     <TouchableOpacity
                                         key={mins}
-                                        onPress={() => ns.setLeadMinutes(mins)}
+                                        onPress={async () => {
+                                            await ns.setLeadMinutes(mins);
+                                            await notificationService.scheduleFromCache('lead_time_' + mins);
+                                        }}
                                         style={{
                                             paddingHorizontal: 10,
                                             paddingVertical: 5,
@@ -463,6 +473,38 @@ function NotificationSection({ tc, typo }) {
                                 <Text style={[styles.testBtnText, { color: tc.accent }]}>Test in 10s</Text>
                             </TouchableOpacity>
                         </View>
+
+                        <View style={{ height: Spacing.s8 }} />
+
+                        {/* Debug: show scheduled */}
+                        <TouchableOpacity
+                            style={[styles.debugBtn, { borderColor: tc.cardBorder }]}
+                            onPress={async () => {
+                                const pending = await notificationService.getPendingPrayerNotifications();
+                                const msg = pending.length === 0
+                                    ? 'No prayer notifications scheduled.'
+                                    : pending.map(p => `#${p.id}\n${p.prayer} Prayer\n${p.body}\nTrigger: ${p.trigger}`).join('\n\n');
+                                Alert.alert(`Scheduled (${pending.length})`, msg);
+                            }}
+                        >
+                            <Text style={[styles.testBtnText, { color: tc.textMuted }]}>Show Scheduled (Debug)</Text>
+                        </TouchableOpacity>
+
+                        <View style={{ height: Spacing.s8 }} />
+
+                        {/* Pipeline test: 60s using real pipeline */}
+                        <TouchableOpacity
+                            style={[styles.debugBtn, { borderColor: tc.accent + '80' }]}
+                            onPress={async () => {
+                                const granted = await notificationService.requestPermission();
+                                if (granted) {
+                                    await notificationService.schedulePipelineTestIn60s();
+                                    Alert.alert('Pipeline Test', 'Scheduled in 60s. Close the app and wait.');
+                                }
+                            }}
+                        >
+                            <Text style={[styles.testBtnText, { color: tc.accent }]}>Pipeline Test 60s</Text>
+                        </TouchableOpacity>
                     </>
                 )}
             </View>
@@ -494,6 +536,12 @@ const styles = StyleSheet.create({
     testBtnText: {
         fontFamily: interFont('600'),
         fontSize: 12,
+    },
+    debugBtn: {
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+        borderWidth: 1,
     },
     gridRow: { flexDirection: 'row' },
     themeCard: {

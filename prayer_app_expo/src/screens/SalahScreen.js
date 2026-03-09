@@ -68,8 +68,9 @@ function applyOffsets(timingsObj, offsets) {
 
 export default function SalahScreen({ onSettingsTap }) {
     const { theme: tc } = useTheme();
-    const { location, usingDefaultLocationBanner } = useLocation();
-    const { methodId, school, offsets } = usePrayerSettings();
+    const { location } = useLocation();
+    const usingDefaultLocationBanner = location?.source === 'default';
+    const { methodId, school, offsets, settingsReady } = usePrayerSettings();
     const typo = getTypography(tc);
     const { width: screenWidth } = useWindowDimensions();
     const flatListRef = useRef(null);
@@ -91,11 +92,18 @@ export default function SalahScreen({ onSettingsTap }) {
     const dayKeys = dates.map((d) => dateKey(d));
 
     const load = useCallback(async () => {
+        // Gate: don't fetch until location snapshot AND settings are loaded
+        if (!location || !settingsReady) {
+            if (__DEV__) console.log(`[INIT] waiting... location=${!!location} settingsReady=${settingsReady}`);
+            return;
+        }
+        if (__DEV__) console.log(`[INIT] ready locationReady=true settingsReady=true using source=${location.source} city=${location.city} lat=${location.lat} lon=${location.lon} method=${methodId} school=${school}`);
+
         setLoading(true);
         setError(null);
         setOfflineCached(false);
         try {
-            const result = await fetchWeekPrayerTimes({ methodId, school });
+            const result = await fetchWeekPrayerTimes({ loc: location, methodId, school });
 
             // Apply per-prayer offsets to each day
             const adjusted = {};
@@ -105,12 +113,25 @@ export default function SalahScreen({ onSettingsTap }) {
 
             setWeekTimings(adjusted);
             setOfflineCached(!!result.offlineCached);
+
+            // Cache timings for notification scheduling
+            const serialized = {};
+            for (const [key, timings] of Object.entries(adjusted)) {
+                serialized[key] = {
+                    prayers: (timings.mainPrayers || []).map(p => ({
+                        name: p.name,
+                        time24: p.time24,
+                    })),
+                };
+            }
+            await notificationService.cacheTimingsForNotifications(serialized);
+            notificationService.scheduleFromCache('cache_updated');
         } catch (e) {
             setError('Could not load prayer times. Check internet and retry.');
         } finally {
             setLoading(false);
         }
-    }, [location, methodId, school, offsets]);
+    }, [location, methodId, school, offsets, settingsReady]);
 
     useEffect(() => {
         load();

@@ -28,11 +28,21 @@
   - "Test in 10s" button
 
 ### Scheduling Logic
-- Uses cached 7-day prayer timings (offline-first)
-- Cancels all previous prayer notifications before rescheduling
-- Only schedules future times; skips past
-- Unique notification IDs per prayer+date
-- Body format: `Adhan at {time} • {city}` or `{name} in {lead} min • Adhan at {time} • {city}`
+**Old behavior (pre-rewrite)**: Scheduled prayers as encountered from cache, with unsorted iteration. No explicit window logging, no sorted candidates. Made it hard to compare across frameworks.
+
+**New policy (both apps, 2026-03-09 rewrite)**:
+- `windowStart = now + 5s`, `windowEnd = now + 48h`
+- Collect all candidates from cached timings × enabled prayers
+- Sort candidates by trigger time → deterministic ordering
+- Schedule all, cancel previous prayer notifications first
+- Persist scheduled list locally for debug: `#id prayer trigger body`
+- Log: `[NOTIF] windowStart=... windowEnd=...` then per-item `[NOTIF] id=... prayer=... trigger=YYYY-MM-DD HH:mm`
+- Settings "Show Scheduled" dialog shows trigger times in both apps
+
+**Why this change**: 
+- Thesis requires deterministic, comparable behavior across frameworks 
+- 48h window is clear and testable
+- Sorted candidates make log output directly comparable
 
 ## Files changed
 
@@ -41,23 +51,26 @@
 | Flutter | `notification_service.dart` | NEW — notification init/test/schedule |
 | Flutter | `notification_settings_service.dart` | NEW — settings notifier |
 | Flutter | `app_header.dart` | MODIFY — added bell icon |
-| Flutter | `settings_screen.dart` | MODIFY — replaced placeholder with real section |
+| Flutter | `settings_screen.dart` | MODIFY — replaced placeholder with real section + trigger display |
 | Flutter | `salah_screen.dart` | MODIFY — wired bell callback |
 | Flutter | `main.dart` | MODIFY — wired notifSettingsNotifier |
 | Expo    | `notificationService.js` | NEW — notification init/test/schedule |
 | Expo    | `notificationSettingsService.js` | NEW — context/hook |
 | Expo    | `AppHeader.js` | MODIFY — added bell icon |
-| Expo    | `SettingsScreen.js` | MODIFY — added NotificationSection |
+| Expo    | `SettingsScreen.js` | MODIFY — added NotificationSection + trigger display |
 | Expo    | `SalahScreen.js` | MODIFY — wired bell callback |
 | Expo    | `App.js` | MODIFY — wired NotificationSettingsProvider |
 
 ## Difficulties / errors encountered
 1. `flutter_local_notifications` (latest version) uses **named parameters** for all methods (`show(id:, title:, body:, notificationDetails:)`, `zonedSchedule(id:, ...)`, `initialize(settings:)`, `cancel(id:)`). Initially used positional args → 8 compile errors → fixed all.
 2. Duplicate stylesheet entries in Expo SettingsScreen after inserting new styles → cleaned up.
+3. **Config mismatch (Expo)**: `PrayerSettingsProvider` initialized `methodId=3` synchronously, then async-loaded `methodId=15`. Fixed with `settingsReady` flag.
+4. **Timezone (Flutter)**: `_resolveTimezone()` returns device TZ (e.g., EET) not location TZ. Documented: prayer times from API are for selected location; if device TZ ≠ location TZ (dev only), trigger times offset. In production, device=location.
 
 ## Flutter vs Expo differences
-- **API**: Flutter uses `flutter_local_notifications` with timezone; Expo uses `expo-notifications` with `TIME_INTERVAL` triggers
-- **Scheduling**: Flutter uses `zonedSchedule` with TZDateTime; Expo uses `scheduleNotificationAsync` with relative seconds
+- **API**: Flutter uses `flutter_local_notifications` with timezone; Expo uses `expo-notifications` with `DATE` triggers
+- **Scheduling**: Flutter uses `zonedSchedule` with TZDateTime; Expo uses `DATE` trigger with absolute Date
+- **IDs**: Flutter uses int (100+); Expo uses string `prayer_YYYY-MM-DD_PrayerName` (both deterministic)
 - **Permissions**: Flutter has separate iOS/Android permission flows; Expo unifies via `requestPermissionsAsync`
 - **Channel**: Flutter creates channel programmatically; Expo uses `setNotificationChannelAsync`
 - No UI or behavioral differences — identical controls, copy text, and scheduling policy.
@@ -69,9 +82,9 @@
 ## Known Limitations
 - iOS simulator may not reliably show scheduled notifications — test on real device
 - Android battery optimization may delay notifications (still scheduled correctly)
-- Timezone in Flutter defaults to UTC — could be improved with native timezone detection
+- Device timezone must match location timezone for correct notification timing (production assumption)
 
 ## Verification
-- `flutter analyze` → **No issues found** ✅
+- `flutter analyze` → 1 info warning only ✅
 - `npx expo export --platform ios` → **Bundle OK** ✅
 - Test buttons: Send Test Now + Schedule Test in 10s ready for verification on device

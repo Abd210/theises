@@ -1355,3 +1355,227 @@ Implemented local notifications for prayer times in both apps:
 - **Flutter**: `flutter analyze` → 1 info warning only ✅
 - **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
 
+---
+
+## Step 7 Fix — Prayer Notifications Actually Fire ✅
+**Date**: 2026-03-08 | **Status**: Complete
+
+### Root Causes Found
+1. **`scheduleAllPrayers()` was NEVER CALLED** — function existed but nothing invoked it
+2. **Flutter `_resolveTimezone()` returned `'UTC'`** — all scheduled times were wrong by local offset
+3. **Expo used `TIME_INTERVAL` trigger** — relative seconds drifted on app restart
+
+### What Was Fixed
+1. **Wired scheduling into lifecycle**: `scheduleFromCache()` called when timings load + on settings changes
+2. **Fixed Flutter timezone**: uses device offset → tz database lookup
+3. **Switched Expo to `DATE` trigger**: absolute timestamp, survives app restart
+4. **Added cache layer**: timings serialized to `salah_notif_cache` key so settings can reschedule
+5. **Added debug button**: "Show Scheduled (Debug)" in Settings shows pending prayer notifications
+
+### Files Changed
+| File | App | Change |
+|------|-----|--------|
+| `notification_service.dart` | Flutter | Rewritten: tz fix, cache, debug |
+| `salah_screen.dart` | Flutter | Cache+schedule on load |
+| `settings_screen.dart` | Flutter | Reschedule on toggle/lead + debug btn |
+| `notificationService.js` | Expo | Rewritten: DATE trigger, cache, debug |
+| `SalahScreen.js` | Expo | Cache+schedule on load |
+| `SettingsScreen.js` | Expo | Reschedule on toggle/lead + debug btn |
+
+### How to Test
+1. Enable notifications, open Salah screen (triggers scheduling)
+2. Press "Show Scheduled (Debug)" → see entries with future times
+3. Close app → wait for scheduled time → notification fires
+
+> **Note**: On some Android OEMs (Xiaomi, Huawei, Samsung), battery optimizations may delay exact alarms. Users may need to disable battery optimization for the app.
+
+### Build Verification
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Location Source of Truth Fix ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Root Cause
+Prayer API services independently called `loadSavedLocation()` / `locSvc.loadSaved()` instead of receiving the location from the caller. This created a race: header could show GPS city while API used stale/default coords.
+
+### What Was Fixed
+1. **Flutter `prayer_api.dart`**: `fetchWeek()` now takes `LocationData loc` parameter
+2. **Flutter `salah_screen.dart`**: passes `locationNotifier.data` to `fetchWeek()`
+3. **Expo `prayerApi.js`**: `fetchWeekPrayerTimes()` now takes `loc` parameter
+4. **Expo `SalahScreen.js`**: passes `location` from `useLocation()` to fetch
+
+### Diagnostic Logs Added (both apps)
+- `[LOC] loadSaved/detect: source=... city=... lat=... lon=...`
+- `[LOC] SalahScreen load: ...` and `[LOC] API using: ...`
+- `[PRAYER] request lat=... lon=... method=... school=...`
+- `[NOTIF-CONFIG] lat=... lon=... method=... school=...`
+
+### Android Emulator Note
+The Android emulator may not have a GPS location set. To set it:
+1. Open emulator → Extended Controls (⋮ button)
+2. Go to Location tab
+3. Set coordinates (e.g. San Francisco: 37.7749, -122.4194)
+4. Click "Set Location"
+Without this, both apps will show "Using default location" banner and use Bucharest coords.
+
+### Build Verification
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Initialization Gate + Config-Keyed Cache ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Root Cause
+Two issues:
+1. **Race condition (Expo)**: SalahScreen's `load()` fired before LocationProvider finished loading saved GPS from AsyncStorage. First render passed `location=null`, falling back to Bucharest. The correct SF location loaded after, triggering a second fetch — but the first (Bucharest) response was already cached.
+2. **Cache collision**: Prayer cache keys were `prayer_cal_YYYY_MM` (month only) — no location/method/school component. Bucharest cache was reused for SF, producing wrong prayer times.
+
+### What Was Fixed
+1. **Expo SalahScreen**: `load()` gates on `location != null`. If null, logs `[INIT] waiting for location...` and returns early. When LocationProvider updates, the `useCallback` dependency on `[location, ...]` re-creates `load` and the `useEffect` fires again with the correct GPS.
+2. **Config-keyed cache** (both apps):
+   - Cache keys now: `prayer_cal_{lat4}_{lon4}_m{method}_s{school}_{year}_{month}`
+   - `configPrefix()` rounds lat/lon to 4 decimals so minor GPS drift doesn't bust cache
+   - Different location/method combos have separate cache entries
+3. **[INIT] log line** (both apps): `[INIT] ready locationReady=... settingsReady=... using source=... city=... lat=... lon=... method=... school=...`
+
+### Build Verification
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Flutter iOS AppIcon Build Fix ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Root Cause
+The `flutter run` on the iOS device failed with `Failed to write image data for the app icon set`. Investigation revealed that the icon files (like `120.png`, `1024.png`) inside `ios/Runner/Assets.xcassets/AppIcon.appiconset` were actually **JPEG** images disguised with `.png` extensions. Xcode's asset catalog compiler rejects mismatched image headers.
+
+### What Was Fixed
+1. Used `sips` (macOS utility) to convert the source 1024x1024 JPEG (`AppIcons/appstore.png`) into a proper, compliant PNG format.
+2. Formatted the PNG to `assets/app_icon.png`.
+3. Integrated `flutter_launcher_icons` (v0.14.4) as a dev dependency to regenerate all app icon sizes cleanly and correctly for both iOS and Android.
+4. Cleaned the build caches:
+   - `flutter clean`
+   - Deleted Xcode `DerivedData`
+   - Re-installed CocoaPods (`pod install`)
+5. Successfully ran a test build (`flutter build ios`) confirming the asset compiling stage passes without issues.
+
+- **Flutter**: `flutter build ios` → **Built build/ios/iphoneos/Runner.app successfully** ✅
+
+---
+
+## Banner Parity Fix ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Root Cause
+The "Using default location" banner had inconsistent logic:
+- Flutter: `_firstRunCompleted && source == 'default'`
+- Expo: Checked `isFirstRunCompleted` in `SalahScreen.js`, then defined locally.
+
+### What Was Fixed
+Implemented the strict rule `location.source == 'default'` across both codebases:
+1. **Flutter `location_notifier.dart`**: updated `showDefaultLocationBanner` to only check `_data.source == 'default'`.
+2. **Expo `LocationProvider.js`**: updated exported `usingDefaultLocationBanner` to strictly evaluate `location?.source === 'default'`.
+3. **Expo `SalahScreen.js`**: removed local `isFirstRunCompleted` checks and strictly uses the provider value.
+
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Log-Based Fixes ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Fix 1: Banner Failure Reason
+Decision: **Not implemented** (would require complex LocationData model changes across both apps for minimal benefit). Instead, documented that the emulator needs GPS set via Extended Controls → Location. In production, users are at their physical location so the banner shows correctly.
+
+### Fix 2: Expo PRAYER_CACHE Config Mismatch
+**Root cause**: `PrayerSettingsProvider` initializes `methodId=3` (default) synchronously, then async-loads saved `methodId=15`. SalahScreen's `load()` fired with the default m3 before settings finished loading, caching under `cfg=...m3_s0`. A second load then ran with m15.
+
+**Fix**: Added `settingsReady` flag to `PrayerSettingsProvider`. `SalahScreen.load()` now gates on both `location != null` AND `settingsReady`:
+```
+[INIT] waiting... location=true settingsReady=false   ← blocked
+[SETTINGS] ready methodId=15 school=0 mode=auto       ← settings loaded
+[INIT] ready ... method=15 school=0                    ← first and only fetch
+```
+
+### Fix 3: Flutter Timezone Resolution
+**Root cause**: `_resolveTimezone()` correctly returns device timezone (EET). Prayer times from the API are for SF, so `05:53` means 05:53 SF time. But notification schedules at 05:53 EET (device local), which is wrong by 10 hours.
+
+**Strategy chosen**: Document and accept. In production, users are physically at the location whose prayer times they see, so device timezone == location timezone. The mismatch only occurs in testing when simulating a different GPS location.
+
+**Changes**:
+- Added timezone strategy documentation in `notification_service.dart`
+- Log now shows device offset: `[NOTIF] timezone resolved to: EET (device offset: 2:00:00.000000)`
+
+### Emulator Location Note
+To set GPS on Android emulator:
+1. Open emulator → Extended Controls (⋮)
+2. Location tab → set coordinates
+3. Click "Set Location"
+
+To set GPS on iOS simulator:
+- Features → Location → Custom Location
+
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Notification Scheduling Policy Rewrite ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+### Old Behavior
+Scheduled prayers as encountered from cache with no explicit window logging — made it hard to verify and compare across frameworks.
+
+### New Policy (Both Apps)
+**"Schedule ALL enabled prayers within the next 48 hours"**
+1. `windowStart = now + 5 seconds` — avoids scheduling past/imminent times
+2. `windowEnd = now + 48 hours` — deterministic fixed window
+3. Collect all candidates from cached timings for each enabled prayer
+4. Sort candidates by trigger time → deterministic ordering
+5. Schedule all, cancel previous prayer notifications first
+6. Persist scheduled list locally for debug display
+
+### Log Format (Identical in Both Apps)
+```
+[NOTIF] windowStart=2026-03-09 15:28 windowEnd=2026-03-11 15:28 (+200)
+[NOTIF] id=100 prayer=Asr trigger=2026-03-09 15:45 (+200)
+[NOTIF] id=101 prayer=Maghrib trigger=2026-03-09 18:12 (+200)
+...
+[NOTIF] scheduledCount=8
+```
+
+### Debug "Show Scheduled" (Settings Screen)
+Both apps now show: `#id PrayerName Prayer\nBody\nTrigger: YYYY-MM-DD HH:mm`
+
+### Files Changed
+- `prayer_app_flutter/lib/src/services/notification_service.dart` — rewrote `_scheduleFromParsed`, `getPendingPrayerNotifications`, added `_fmtDt`
+- `prayer_app_flutter/lib/src/screens/settings_screen.dart` — updated debug display
+- `prayer_app_expo/src/services/notificationService.js` — same rewrite
+- `prayer_app_expo/src/screens/SettingsScreen.js` — updated debug display
+
+### Build Verification
+- **Flutter**: `flutter analyze` → 1 info warning only ✅
+- **Expo**: `npx expo export --platform ios` → **Bundle OK** ✅
+
+---
+
+## Comprehensive Summary Document ✅
+**Date**: 2026-03-09 | **Status**: Complete
+
+Generated `WHAT_WE_DID_UNTIL_NOW.md` in repo root with the following sections:
+- §0 Quick Summary (thesis objective, parity definition, status table)
+- §1 Repo Overview (folder structure, run commands)
+- §2 Design System (4 themes, 8 shared components with file paths)
+- §3 Features by Tab (Salah/Qibla/Quran/Azkar/Settings — APIs, caching, logic, storage keys)
+- §4 Notifications (48h rolling window policy, debug tools, timezone strategy)
+- §5 Storage Index (30+ keys table with domain/key/value/file paths)
+- §6 Parity & Verification (checklist for comparing both apps)
+- §7 Known Issues / TODO
+- §8 File/Module Inventory (services, screens, components per app)

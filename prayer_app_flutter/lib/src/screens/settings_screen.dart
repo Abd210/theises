@@ -512,8 +512,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 if (!perm) return;
                               }
                               await ns.setEnabled(on);
-                              if (!on) {
-                                await NotificationService().cancelAll();
+                              if (on) {
+                                await NotificationService().scheduleFromCache();
+                              } else {
+                                await NotificationService().cancelPrayerNotifications();
                               }
                             },
                           ),
@@ -545,7 +547,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 child: Switch.adaptive(
                                   value: ns.isPrayerEnabled(prayer),
                                   activeTrackColor: tc.accent,
-                                  onChanged: (on) => ns.setPrayerEnabled(prayer, on),
+                                  onChanged: (on) async {
+                                    await ns.setPrayerEnabled(prayer, on);
+                                    await NotificationService().scheduleFromCache();
+                                  },
                                 ),
                               ),
                             ],
@@ -573,7 +578,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(left: 6),
                               child: GestureDetector(
-                                onTap: () => ns.setLeadMinutes(mins),
+                                onTap: () async {
+                                  await ns.setLeadMinutes(mins);
+                                  await NotificationService().scheduleFromCache();
+                                },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
@@ -655,6 +663,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                         ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.s8),
+
+                      // Debug: show scheduled
+                      GestureDetector(
+                        onTap: () async {
+                          final pending = await NotificationService().getPendingPrayerNotifications();
+                          if (!context.mounted) return;
+                          showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              backgroundColor: tc.card,
+                              title: Text(
+                                'Scheduled Notifications (${pending.length})',
+                                style: TextStyle(color: tc.textPrimary, fontSize: 16),
+                              ),
+                              content: SizedBox(
+                                width: double.maxFinite,
+                                height: 300,
+                                child: pending.isEmpty
+                                    ? Center(
+                                        child: Text('No prayer notifications scheduled.',
+                                          style: TextStyle(color: tc.textMuted, fontSize: 13)),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: pending.length,
+                                        itemBuilder: (_, i) {
+                                          final p = pending[i];
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 8),
+                                            child: Text(
+                                              '#${p['id']} ${p['prayer']} Prayer\n${p['body']}\nTrigger: ${p['trigger']}',
+                                              style: TextStyle(color: tc.textPrimary, fontSize: 12),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text('Close', style: TextStyle(color: tc.accent)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: tc.cardBorder),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Show Scheduled (Debug)',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: tc.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.s8),
+
+                      // Pipeline test: schedule in 60s using real pipeline
+                      GestureDetector(
+                        onTap: () async {
+                          final perm = await NotificationService().requestPermission();
+                          if (perm) {
+                            await NotificationService().schedulePipelineTestIn60s();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Pipeline test scheduled in 60s. Close the app and wait.'),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: tc.accent.withValues(alpha: 0.5)),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Pipeline Test 60s',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: tc.accent,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ],

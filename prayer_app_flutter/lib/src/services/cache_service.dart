@@ -7,39 +7,46 @@ class CacheService {
   static const String _dataKey = 'cached_prayer_json';
   static const String _dateKey = 'cached_prayer_date';
 
-  // ── Monthly calendar cache keys ──
-  static String _monthDataKey(int year, int month) =>
-      'prayer_cal_${year}_${month.toString().padLeft(2, '0')}';
-  static String _monthSavedKey(int year, int month) =>
-      'prayer_cal_saved_${year}_${month.toString().padLeft(2, '0')}';
-
   static const int _ttlDays = 7;
 
-  // ── Monthly calendar cache ──
+  /// Build a config fingerprint for cache keying.
+  /// Rounds lat/lon to 4 decimals so minor GPS drift doesn't bust cache.
+  static String configPrefix(double lat, double lon, int method, int school) {
+    final latR = lat.toStringAsFixed(4);
+    final lonR = lon.toStringAsFixed(4);
+    return '${latR}_${lonR}_m${method}_s$school';
+  }
 
-  /// Save raw calendar API response for a given month.
-  Future<void> saveMonth(int year, int month, String jsonStr) async {
+  // ── Monthly calendar cache (config-keyed) ──
+
+  static String _monthDataKey(int year, int month, String cfgPrefix) =>
+      'prayer_cal_${cfgPrefix}_${year}_${month.toString().padLeft(2, '0')}';
+  static String _monthSavedKey(int year, int month, String cfgPrefix) =>
+      'prayer_cal_saved_${cfgPrefix}_${year}_${month.toString().padLeft(2, '0')}';
+
+  /// Save raw calendar API response for a given month + config.
+  Future<void> saveMonth(int year, int month, String jsonStr, String cfgPrefix) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_monthDataKey(year, month), jsonStr);
+    await prefs.setString(_monthDataKey(year, month, cfgPrefix), jsonStr);
     await prefs.setString(
-      _monthSavedKey(year, month),
+      _monthSavedKey(year, month, cfgPrefix),
       DateTime.now().toIso8601String(),
     );
     if (kDebugMode) {
-      debugPrint('[PRAYER_CACHE] saved month=$month year=$year');
+      debugPrint('[PRAYER_CACHE] saved month=$month year=$year cfg=$cfgPrefix');
     }
   }
 
-  /// Load cached calendar JSON for a given month, or null if missing.
-  Future<String?> loadMonth(int year, int month) async {
+  /// Load cached calendar JSON for a given month + config, or null.
+  Future<String?> loadMonth(int year, int month, String cfgPrefix) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_monthDataKey(year, month));
+    return prefs.getString(_monthDataKey(year, month, cfgPrefix));
   }
 
   /// Check if the cached month is still within TTL (7 days).
-  Future<bool> isMonthValid(int year, int month) async {
+  Future<bool> isMonthValid(int year, int month, String cfgPrefix) async {
     final prefs = await SharedPreferences.getInstance();
-    final savedStr = prefs.getString(_monthSavedKey(year, month));
+    final savedStr = prefs.getString(_monthSavedKey(year, month, cfgPrefix));
     if (savedStr == null) return false;
     final savedAt = DateTime.tryParse(savedStr);
     if (savedAt == null) return false;

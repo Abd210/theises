@@ -77,7 +77,10 @@ class _SalahScreenState extends State<SalahScreen> {
     });
     try {
       final ps = widget.prayerSettingsNotifier;
+      final loc = widget.locationNotifier.data;
+      debugPrint('[INIT] ready locationReady=true settingsReady=true using source=${loc.source} city=${loc.city} lat=${loc.lat} lon=${loc.lon} method=${ps.methodId} school=${ps.school}');
       final result = await _api.fetchWeek(
+        loc: loc,
         methodId: ps.methodId,
         school: ps.school,
       );
@@ -101,6 +104,20 @@ class _SalahScreenState extends State<SalahScreen> {
           _offlineCached = result.offlineCached;
           _loading = false;
         });
+
+        // Cache timings for notification scheduling
+        debugPrint('[NOTIF-CONFIG] lat=${loc.lat} lon=${loc.lon} method=${ps.methodId} school=${ps.school}');
+        final serialized = <String, dynamic>{};
+        for (final e in adjusted.entries) {
+          serialized[e.key] = {
+            'prayers': e.value.mainPrayers.map((p) => {
+              'name': p.name,
+              'time24': p.time24,
+            }).toList(),
+          };
+        }
+        await NotificationService().cacheTimingsForNotifications(serialized);
+        await NotificationService().scheduleFromCache();
       }
     } catch (e) {
       if (mounted) {

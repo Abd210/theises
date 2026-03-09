@@ -2,32 +2,42 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TTL_DAYS = 7;
 
-function monthDataKey(year, month) {
-    return `prayer_cal_${year}_${String(month).padStart(2, '0')}`;
+/**
+ * Build a config fingerprint for cache keying.
+ * Rounds lat/lon to 4 decimals so minor GPS drift doesn't bust cache.
+ */
+function configPrefix(lat, lon, method, school) {
+    const latR = (lat || 0).toFixed(4);
+    const lonR = (lon || 0).toFixed(4);
+    return `${latR}_${lonR}_m${method}_s${school}`;
 }
-function monthSavedKey(year, month) {
-    return `prayer_cal_saved_${year}_${String(month).padStart(2, '0')}`;
+
+function monthDataKey(year, month, cfgPrefix) {
+    return `prayer_cal_${cfgPrefix}_${year}_${String(month).padStart(2, '0')}`;
+}
+function monthSavedKey(year, month, cfgPrefix) {
+    return `prayer_cal_saved_${cfgPrefix}_${year}_${String(month).padStart(2, '0')}`;
 }
 
 /**
- * Save raw calendar API JSON for a given month.
+ * Save raw calendar API JSON for a given month + config.
  */
-export async function saveMonth(year, month, jsonStr) {
+export async function saveMonth(year, month, jsonStr, cfgPrefix) {
     try {
-        await AsyncStorage.setItem(monthDataKey(year, month), jsonStr);
-        await AsyncStorage.setItem(monthSavedKey(year, month), new Date().toISOString());
-        if (__DEV__) console.log(`[PRAYER_CACHE] saved month=${month} year=${year}`);
+        await AsyncStorage.setItem(monthDataKey(year, month, cfgPrefix), jsonStr);
+        await AsyncStorage.setItem(monthSavedKey(year, month, cfgPrefix), new Date().toISOString());
+        if (__DEV__) console.log(`[PRAYER_CACHE] saved month=${month} year=${year} cfg=${cfgPrefix}`);
     } catch (e) {
         // Ignore
     }
 }
 
 /**
- * Load cached calendar JSON for a given month, or null.
+ * Load cached calendar JSON for a given month + config, or null.
  */
-export async function loadMonth(year, month) {
+export async function loadMonth(year, month, cfgPrefix) {
     try {
-        return await AsyncStorage.getItem(monthDataKey(year, month));
+        return await AsyncStorage.getItem(monthDataKey(year, month, cfgPrefix));
     } catch (e) {
         return null;
     }
@@ -36,9 +46,9 @@ export async function loadMonth(year, month) {
 /**
  * Check if cached month is within 7-day TTL.
  */
-export async function isMonthValid(year, month) {
+export async function isMonthValid(year, month, cfgPrefix) {
     try {
-        const savedStr = await AsyncStorage.getItem(monthSavedKey(year, month));
+        const savedStr = await AsyncStorage.getItem(monthSavedKey(year, month, cfgPrefix));
         if (!savedStr) return false;
         const savedAt = new Date(savedStr);
         const diffDays = (Date.now() - savedAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -64,3 +74,5 @@ export function extractDay(monthJson, dayOfMonth) {
         return null;
     }
 }
+
+export { configPrefix };

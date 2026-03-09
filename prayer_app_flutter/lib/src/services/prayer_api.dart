@@ -24,11 +24,12 @@ class PrayerApiService {
   /// Fetch prayer times for 7 days (today..today+6).
   /// Uses the monthly calendar endpoint and caches full months.
   Future<PrayerWeekResult> fetchWeek({
+    required LocationData loc,
     required int methodId,
     required int school,
   }) async {
-    final locSvc = LocationService();
-    final loc = await locSvc.loadSaved();
+    final cfgPrefix = CacheService.configPrefix(loc.lat, loc.lon, methodId, school);
+    debugPrint('[LOC] API using source=${loc.source} city=${loc.city} lat=${loc.lat} lon=${loc.lon} cfg=$cfgPrefix');
     final now = DateTime.now();
 
     // Determine which months we need (today..today+6 might span 2 months)
@@ -47,14 +48,14 @@ class PrayerApiService {
       final year = int.parse(parts[0]);
       final month = int.parse(parts[1]);
 
-      // Check cache validity
-      final valid = await _cache.isMonthValid(year, month);
+      // Check cache validity (config-keyed)
+      final valid = await _cache.isMonthValid(year, month, cfgPrefix);
       if (valid) {
-        final cached = await _cache.loadMonth(year, month);
+        final cached = await _cache.loadMonth(year, month, cfgPrefix);
         if (cached != null) {
           monthJsons[key] = cached;
           if (kDebugMode) {
-            debugPrint('[PRAYER_CACHE] hit month=$month year=$year');
+            debugPrint('[PRAYER_CACHE] hit month=$month year=$year cfg=$cfgPrefix');
           }
           continue;
         }
@@ -66,21 +67,21 @@ class PrayerApiService {
           '&method=$methodId&school=$school'
           '&month=$month&year=$year';
 
-      if (kDebugMode) debugPrint('[PRAYER_CACHE] miss month=$month year=$year');
-      if (kDebugMode) debugPrint('[PrayerAPI] calendar URL: $url');
+      if (kDebugMode) debugPrint('[PRAYER_CACHE] miss month=$month year=$year cfg=$cfgPrefix');
+      if (kDebugMode) debugPrint('[PRAYER] request lat=${loc.lat} lon=${loc.lon} method=$methodId school=$school month=$month year=$year');
 
       try {
         final response = await http.get(Uri.parse(url));
         if (response.statusCode == 200) {
           monthJsons[key] = response.body;
-          await _cache.saveMonth(year, month, response.body);
+          await _cache.saveMonth(year, month, response.body, cfgPrefix);
         } else {
           anyNetworkFail = true;
           if (kDebugMode) {
             debugPrint('[PrayerAPI] calendar failed status=${response.statusCode}');
           }
           // Try stale cache
-          final stale = await _cache.loadMonth(year, month);
+          final stale = await _cache.loadMonth(year, month, cfgPrefix);
           if (stale != null) monthJsons[key] = stale;
         }
       } catch (e) {
@@ -89,7 +90,7 @@ class PrayerApiService {
           debugPrint('[PrayerAPI] calendar fetch error: $e');
         }
         // Try stale cache
-        final stale = await _cache.loadMonth(year, month);
+        final stale = await _cache.loadMonth(year, month, cfgPrefix);
         if (stale != null) monthJsons[key] = stale;
       }
     }

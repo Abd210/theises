@@ -36,6 +36,7 @@ export function PrayerSettingsProvider({ children }) {
     const [school, setSchoolState] = useState(DEFAULT_SCHOOL);
     const [methodMode, setMethodModeState] = useState(DEFAULT_METHOD_MODE);
     const [offsets, setOffsetsState] = useState({ ...defaultOffsets });
+    const [settingsReady, setSettingsReady] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -45,6 +46,8 @@ export function PrayerSettingsProvider({ children }) {
             setMethodModeState(settings.methodMode);
             const savedOffsets = await loadOffsets();
             setOffsetsState(savedOffsets);
+            setSettingsReady(true);
+            if (__DEV__) console.log(`[SETTINGS] ready methodId=${settings.methodId} school=${settings.school} mode=${settings.methodMode}`);
         })();
     }, []);
 
@@ -84,7 +87,7 @@ export function PrayerSettingsProvider({ children }) {
 
     return (
         <PrayerSettingsContext.Provider value={{
-            methodId, school, methodMode, offsets,
+            methodId, school, methodMode, offsets, settingsReady,
             setMethodId, setMethodIdAuto, setMethodMode, setSchool, setOffset,
         }}>
             {children}
